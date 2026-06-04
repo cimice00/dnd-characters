@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#17130f" />
+    <title>Compendio Personaggi D&D</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <button class="icon-button" type="button" title="Personaggi" aria-label="Personaggi">&#9776;</button>
+        <div class="session-title">
+          <span>Sessione</span>
+          <strong data-session-name>La Miniera Perduta</strong>
+        </div>
+        <button class="icon-button theme-button" id="themeButton" type="button" title="Cambia tema" aria-label="Cambia tema">&#9680;</button>
+      </header>
+
+      <section class="hero">
+        <div class="hero-ring" aria-hidden="true"></div>
+        <label class="field hero-name">
+          <span>Nome personaggio</span>
+          <input data-field="name" type="text" autocomplete="off" />
+        </label>
+        <div class="hero-grid">
+          <label class="field">
+            <span>Razza</span>
+            <input data-field="race" type="text" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Classe & livello</span>
+            <input data-field="classLevel" type="text" autocomplete="off" />
+          </label>
+        </div>
+      </section>
+
+      <section class="combat-core" aria-label="Dati principali">
+        <article class="hp-panel">
+          <div class="section-title">
+            <span>Punti Ferita</span>
+            <small>attuali / massimi / temporanei</small>
+          </div>
+          <div class="hp-row">
+            <button class="step-button" data-action="hp-minus" type="button" aria-label="Riduci punti ferita" title="Riduci punti ferita">−</button>
+            <label class="number-field hp-now">
+              <span>PF</span>
+              <input data-field="hpCurrent" type="number" inputmode="numeric" />
+            </label>
+            <button class="step-button" data-action="hp-plus" type="button" aria-label="Aumenta punti ferita" title="Aumenta punti ferita">+</button>
+          </div>
+          <div class="mini-grid three">
+            <label class="number-field">
+              <span>Max</span>
+              <input data-field="hpMax" type="number" inputmode="numeric" />
+            </label>
+            <label class="number-field">
+              <span>Temp</span>
+              <input data-field="hpTemp" type="number" inputmode="numeric" />
+            </label>
+            <label class="number-field">
+              <span>Dadi vita</span>
+              <input data-field="hitDice" type="text" inputmode="text" />
+            </label>
+          </div>
+        </article>
+
+        <div class="stat-strip">
+          <label class="quick-stat">
+            <span>CA</span>
+            <input data-field="armorClass" type="number" inputmode="numeric" />
+          </label>
+          <label class="quick-stat">
+            <span>Iniz.</span>
+            <input data-field="initiative" type="text" inputmode="text" />
+          </label>
+          <label class="quick-stat">
+            <span>Vel.</span>
+            <input data-field="speed" type="text" inputmode="text" />
+          </label>
+          <label class="quick-stat">
+            <span>Comp.</span>
+            <input data-field="proficiency" type="number" inputmode="numeric" />
+          </label>
+        </div>
+
+        <article class="death-panel">
+          <div class="section-title">
+            <span>TS contro Morte</span>
+            <small>successi / fallimenti</small>
+          </div>
+          <div class="death-grid">
+            <div class="death-track" aria-label="Successi">
+              <span>Successi</span>
+              <label><input data-death="successes" value="1" type="checkbox" /><i></i></label>
+              <label><input data-death="successes" value="2" type="checkbox" /><i></i></label>
+              <label><input data-death="successes" value="3" type="checkbox" /><i></i></label>
+            </div>
+            <div class="death-track fail" aria-label="Fallimenti">
+              <span>Fallimenti</span>
+              <label><input data-death="failures" value="1" type="checkbox" /><i></i></label>
+              <label><input data-death="failures" value="2" type="checkbox" /><i></i></label>
+              <label><input data-death="failures" value="3" type="checkbox" /><i></i></label>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="ability-band" aria-label="Caratteristiche">
+        <div class="section-title">
+          <span>Caratteristiche</span>
+          <small>modificatore in evidenza</small>
+        </div>
+        <div class="ability-grid" id="abilityGrid"></div>
+      </section>
+
+      <section class="attacks-panel">
+        <div class="section-title action-title">
+          <span>Attacchi & Incantesimi</span>
+          <button class="small-button" id="addAttackButton" type="button">+</button>
+        </div>
+        <div class="attack-list" id="attackList"></div>
+      </section>
+
+      <nav class="tab-bar" aria-label="Sezioni scheda">
+        <button class="tab-button active" data-tab="skills" type="button">Abilità</button>
+        <button class="tab-button" data-tab="magic" type="button">Magia</button>
+        <button class="tab-button" data-tab="inventory" type="button">Borsa</button>
+        <button class="tab-button" data-tab="story" type="button">Storia</button>
+      </nav>
+
+      <section class="tab-panel active" id="skills">
+        <div class="inspiration-row">
+          <label class="toggle-field">
+            <input data-field="inspiration" type="checkbox" />
+            <span>Ispirazione</span>
+          </label>
+          <label class="passive-field">
+            <span>Percezione Passiva</span>
+            <input data-field="passivePerception" type="number" inputmode="numeric" />
+          </label>
+        </div>
+
+        <details open>
+          <summary>Tiri salvezza</summary>
+          <div class="check-list" id="saveList"></div>
+        </details>
+
+        <details open>
+          <summary>Abilità</summary>
+          <div class="check-list skills-list" id="skillList"></div>
+        </details>
+
+        <label class="field full">
+          <span>Altre competenze & linguaggi</span>
+          <textarea data-field="proficienciesLanguages" rows="4"></textarea>
+        </label>
+        <label class="field full">
+          <span>Privilegi & tratti</span>
+          <textarea data-field="featuresTraits" rows="6"></textarea>
+        </label>
+      </section>
+
+      <section class="tab-panel" id="magic">
+        <div class="spell-summary">
+          <label class="number-field">
+            <span>CD inc.</span>
+            <input data-field="spellDc" type="number" inputmode="numeric" />
+          </label>
+          <label class="number-field">
+            <span>Bonus att.</span>
+            <input data-field="spellAttack" type="text" inputmode="text" />
+          </label>
+        </div>
+        <div class="slots-grid" id="slotsGrid"></div>
+        <div class="known-spells" id="knownSpellList"></div>
+        <details class="spell-manager">
+          <summary>
+            <span>Aggiungi / gestisci incantesimi</span>
+            <small id="spellResultCount">0 disponibili</small>
+          </summary>
+          <section class="spell-picker" aria-label="Aggiungi incantesimi">
+            <div class="spell-filter-grid">
+              <label class="field">
+                <span>Classe</span>
+                <select id="spellClassFilter"></select>
+              </label>
+              <label class="field">
+                <span>Livello</span>
+                <select id="spellLevelFilter"></select>
+              </label>
+              <label class="field full-row">
+                <span>Fonte</span>
+                <select id="spellSourceFilter"></select>
+              </label>
+              <label class="field full-row">
+                <span>Cerca</span>
+                <input id="spellSearchInput" type="search" autocomplete="off" placeholder="Nome, scuola, fonte..." />
+              </label>
+            </div>
+            <div class="spell-list" id="spellList"></div>
+            <details class="custom-spell-manager">
+              <summary>
+                <span>Incantesimo custom</span>
+                <small>Database locale</small>
+              </summary>
+              <div class="custom-spell-form">
+                <label class="field full-row">
+                  <span>Nome</span>
+                  <input id="customSpellName" type="text" autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span>Classe</span>
+                  <input id="customSpellClass" list="customSpellClassOptions" type="text" autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span>Livello</span>
+                  <input id="customSpellLevel" list="customSpellLevelOptions" type="number" inputmode="numeric" min="0" />
+                </label>
+                <label class="field">
+                  <span>Scuola</span>
+                  <input id="customSpellSchool" type="text" autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span>Fonte</span>
+                  <input id="customSpellSource" type="text" value="Custom" autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span>Tempo</span>
+                  <input id="customSpellCasting" type="text" autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span>Raggio</span>
+                  <input id="customSpellRange" type="text" autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span>Componenti</span>
+                  <input id="customSpellComponents" type="text" autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span>Durata</span>
+                  <input id="customSpellDuration" type="text" autocomplete="off" />
+                </label>
+                <label class="field full-row">
+                  <span>Descrizione</span>
+                  <textarea id="customSpellDescription" rows="4"></textarea>
+                </label>
+                <button class="small-button full-row" id="addCustomSpellButton" type="button">Aggiungi al database</button>
+              </div>
+              <datalist id="customSpellClassOptions"></datalist>
+              <datalist id="customSpellLevelOptions"></datalist>
+            </details>
+          </section>
+        </details>
+      </section>
+
+      <section class="tab-panel" id="inventory">
+        <div class="coins-grid">
+          <label class="number-field"><span>MR</span><input data-field="coinMr" type="number" inputmode="numeric" /></label>
+          <label class="number-field"><span>MA</span><input data-field="coinMa" type="number" inputmode="numeric" /></label>
+          <label class="number-field"><span>ME</span><input data-field="coinMe" type="number" inputmode="numeric" /></label>
+          <label class="number-field"><span>MO</span><input data-field="coinMo" type="number" inputmode="numeric" /></label>
+          <label class="number-field"><span>MP</span><input data-field="coinMp" type="number" inputmode="numeric" /></label>
+        </div>
+        <div class="equipment-header">
+          <span>Equipaggiamento</span>
+          <button class="small-button" id="addEquipmentButton" type="button">+</button>
+        </div>
+        <div class="equipment-list" id="equipmentList"></div>
+      </section>
+
+      <section class="tab-panel" id="story">
+        <div class="mini-grid two">
+          <label class="field"><span>Background</span><input data-field="background" type="text" /></label>
+          <label class="field"><span>Allineamento</span><input data-field="alignment" type="text" /></label>
+          <label class="field"><span>PX</span><input data-field="experience" type="number" inputmode="numeric" /></label>
+          <label class="field"><span>Giocatore</span><input data-field="playerName" type="text" /></label>
+        </div>
+        <div class="mini-grid two">
+          <label class="field"><span>Età</span><input data-field="age" type="text" /></label>
+          <label class="field"><span>Altezza</span><input data-field="height" type="text" /></label>
+          <label class="field"><span>Peso</span><input data-field="weight" type="text" /></label>
+          <label class="field"><span>Occhi</span><input data-field="eyes" type="text" /></label>
+          <label class="field"><span>Pelle</span><input data-field="skin" type="text" /></label>
+          <label class="field"><span>Capelli</span><input data-field="hair" type="text" /></label>
+        </div>
+        <label class="field full"><span>Tratti caratteriali</span><textarea data-field="personality" rows="3"></textarea></label>
+        <label class="field full"><span>Ideali</span><textarea data-field="ideals" rows="3"></textarea></label>
+        <label class="field full"><span>Legami</span><textarea data-field="bonds" rows="3"></textarea></label>
+        <label class="field full"><span>Difetti</span><textarea data-field="flaws" rows="3"></textarea></label>
+        <label class="field full"><span>Storia</span><textarea data-field="backstory" rows="6"></textarea></label>
+        <label class="field full"><span>Alleati & organizzazioni</span><textarea data-field="allies" rows="4"></textarea></label>
+        <label class="field full"><span>Tesoro</span><textarea data-field="treasure" rows="4"></textarea></label>
+        <label class="field full"><span>Simbolo</span><textarea data-field="symbol" rows="3"></textarea></label>
+      </section>
+
+    </main>
+
+    <script src="spells-db.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
