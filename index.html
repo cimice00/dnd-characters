@@ -7,64 +7,68 @@
     <title>Compendio Personaggi D&D</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles-v12.css" />
   </head>
   <body>
-    <main class="app-shell">
+    <main class="auth-screen app-view" id="authView">
+      <section class="auth-card">
+        <div class="brand-block">
+          <span>Compendio D&D</span>
+          <h1>Accesso</h1>
+        </div>
+        <label class="field">
+          <span>Email</span>
+          <input id="loginEmail" type="email" autocomplete="email" />
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <input id="loginPassword" type="password" autocomplete="current-password" />
+        </label>
+        <button class="primary-button" id="loginSubmit" type="button">Entra</button>
+        <p class="view-status" id="loginStatus">Accedi per scegliere una sessione.</p>
+      </section>
+    </main>
+
+    <main class="session-screen app-view" id="sessionView" hidden>
+      <header class="screen-topbar">
+        <div>
+          <span>Account</span>
+          <strong id="sessionUserName">Utente</strong>
+        </div>
+        <button class="icon-button" id="sessionMenuButton" type="button" title="Menu" aria-label="Menu">&#9776;</button>
+      </header>
+      <section class="session-create-panel">
+        <label class="field">
+          <span>Nuova sessione</span>
+          <input id="newSessionName" type="text" autocomplete="off" placeholder="Nome sessione" />
+        </label>
+        <button class="small-button" id="createSessionFromList" type="button">Crea sessione</button>
+      </section>
+      <section class="list-panel">
+        <div class="section-title">
+          <span>Sessioni attive</span>
+          <small id="sessionCount">0</small>
+        </div>
+        <div class="session-list" id="sessionList"></div>
+      </section>
+      <section class="list-panel">
+        <div class="section-title">
+          <span>Inviti</span>
+          <small id="inviteCount">0</small>
+        </div>
+        <div class="invite-list" id="inviteList"></div>
+      </section>
+    </main>
+
+    <main class="app-shell app-view" id="characterView" hidden>
       <header class="topbar">
-        <button class="icon-button" type="button" title="Personaggi" aria-label="Personaggi">&#9776;</button>
+        <button class="icon-button" id="menuButton" type="button" title="Menu" aria-label="Menu">&#9776;</button>
         <div class="session-title">
           <span>Sessione</span>
           <strong data-session-name>La Miniera Perduta</strong>
         </div>
         <button class="icon-button theme-button" id="themeButton" type="button" title="Cambia tema" aria-label="Cambia tema">&#9680;</button>
       </header>
-
-      <details class="sync-panel" id="syncPanel">
-        <summary>
-          <span>Account e database</span>
-          <small id="syncStatus">Solo dispositivo</small>
-        </summary>
-        <div class="sync-body">
-          <div class="auth-box" id="authSignedOut">
-            <label class="field">
-              <span>Email</span>
-              <input id="authEmail" type="email" autocomplete="email" />
-            </label>
-            <label class="field">
-              <span>Password</span>
-              <input id="authPassword" type="password" autocomplete="current-password" />
-            </label>
-            <div class="sync-actions">
-              <button class="small-button" id="loginButton" type="button">Entra</button>
-              <button class="small-button" id="signupButton" type="button">Crea account</button>
-            </div>
-          </div>
-
-          <div class="auth-box" id="authSignedIn" hidden>
-            <div class="account-line">
-              <span id="accountEmail">Non connesso</span>
-              <button class="small-button" id="logoutButton" type="button">Esci</button>
-            </div>
-            <label class="field">
-              <span>Nome sessione</span>
-              <input id="sessionNameInput" type="text" autocomplete="off" />
-            </label>
-            <div class="sync-actions">
-              <button class="small-button" id="createSessionButton" type="button">Crea / apri sessione</button>
-              <button class="small-button" id="saveCloudButton" type="button">Salva ora</button>
-            </div>
-            <section class="master-message-box">
-              <div class="section-title compact-title">
-                <span>Messaggi master</span>
-                <small id="masterMessageCount">0</small>
-              </div>
-              <div id="masterMessages" class="master-message-list">
-                <div class="empty-state">Nessun messaggio.</div>
-              </div>
-            </section>
-          </div>
-        </div>
-      </details>
 
       <section class="hero">
         <div class="hero-ring" aria-hidden="true"></div>
@@ -345,10 +349,80 @@
 
     </main>
 
+    <aside class="drawer-backdrop" id="drawerBackdrop" hidden></aside>
+    <aside class="side-drawer" id="sideDrawer" hidden>
+      <header class="drawer-header">
+        <div>
+          <span>Menu</span>
+          <strong id="drawerUserName">Utente</strong>
+        </div>
+        <button class="icon-button" id="closeDrawerButton" type="button" title="Chiudi" aria-label="Chiudi">×</button>
+      </header>
+
+      <section class="drawer-section">
+        <div class="section-title compact-title">
+          <span>Account</span>
+          <small id="syncStatus">Non connesso</small>
+        </div>
+        <p class="muted-line" id="drawerUserEmail"></p>
+        <label class="field">
+          <span>Nuova password</span>
+          <input id="ownNewPassword" type="password" autocomplete="new-password" />
+        </label>
+        <button class="small-button" id="changeOwnPasswordButton" type="button">Cambia password</button>
+        <button class="small-button" id="logoutButton" type="button">Esci</button>
+      </section>
+
+      <section class="drawer-section">
+        <div class="section-title compact-title">
+          <span>Sessione</span>
+          <small id="currentSessionRole">-</small>
+        </div>
+        <button class="small-button" id="backToSessionsButton" type="button">Torna alle sessioni</button>
+        <div class="session-master-tools" id="sessionMasterTools" hidden>
+          <label class="field">
+            <span>Invita utente</span>
+            <input id="inviteUserSearch" type="search" autocomplete="off" placeholder="Cerca username" />
+          </label>
+          <div class="search-results" id="inviteUserResults"></div>
+        </div>
+      </section>
+
+      <section class="drawer-section">
+        <div class="section-title compact-title">
+          <span>Inviti</span>
+          <small id="drawerInviteCount">0</small>
+        </div>
+        <div class="invite-list compact" id="drawerInviteList"></div>
+      </section>
+
+      <section class="drawer-section admin-panel" id="adminPanel" hidden>
+        <div class="section-title compact-title">
+          <span>Admin</span>
+          <small>Controllo</small>
+        </div>
+        <details open>
+          <summary>Account</summary>
+          <div class="admin-form">
+            <label class="field"><span>Email</span><input id="adminNewUserEmail" type="email" autocomplete="off" /></label>
+            <label class="field"><span>Username</span><input id="adminNewUsername" type="text" autocomplete="off" /></label>
+            <label class="field"><span>Nome</span><input id="adminNewDisplayName" type="text" autocomplete="off" /></label>
+            <label class="field"><span>Password</span><input id="adminNewPassword" type="password" autocomplete="new-password" /></label>
+            <button class="small-button" id="adminCreateUserButton" type="button">Crea account</button>
+          </div>
+          <div class="admin-list" id="adminUsersList"></div>
+        </details>
+        <details>
+          <summary>Sessioni</summary>
+          <div class="admin-list" id="adminSessionsList"></div>
+        </details>
+      </section>
+    </aside>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="spells-db.js"></script>
     <script src="supabase-config.js"></script>
     <script src="app.js"></script>
-    <script src="supabase-sync.js"></script>
+    <script src="app-v12.js"></script>
   </body>
 </html>
