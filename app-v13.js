@@ -3,7 +3,23 @@
   const SESSION_ID_KEY = "dnd-mobile-session-id-v1";
   const CHARACTER_ID_KEY = "dnd-mobile-character-id-v1";
   const MASTER_PREVIEW_KEY = "dnd-master-character-preview-v1";
-  const APP_VERSION = "1.3.0";
+  const APP_VERSION = "1.4.0";
+  const DEFAULT_THEME_PALETTE = {
+    dark: { background: "#17130f", surface: "#231d17", accent: "#d8ae5f" },
+    light: { background: "#f0ece4", surface: "#fff8ee", accent: "#7f5217" },
+  };
+  const THEME_PALETTE_PRESETS = [
+    DEFAULT_THEME_PALETTE,
+    { dark: { background: "#10161b", surface: "#19242c", accent: "#63b3c2" }, light: { background: "#eef7f6", surface: "#ffffff", accent: "#217985" } },
+    { dark: { background: "#151017", surface: "#24192a", accent: "#c084fc" }, light: { background: "#f7f0fb", surface: "#ffffff", accent: "#7e3bb2" } },
+    { dark: { background: "#10170f", surface: "#1b2618", accent: "#84cc6a" }, light: { background: "#f1f7ed", surface: "#ffffff", accent: "#4b842f" } },
+    { dark: { background: "#190f12", surface: "#2a181d", accent: "#f06a7a" }, light: { background: "#fff0f2", surface: "#ffffff", accent: "#b93649" } },
+    { dark: { background: "#14110e", surface: "#251d16", accent: "#f59e42" }, light: { background: "#fff6eb", surface: "#ffffff", accent: "#9a5a16" } },
+    { dark: { background: "#0f141d", surface: "#182133", accent: "#7aa7ff" }, light: { background: "#eef3ff", surface: "#ffffff", accent: "#2f62bd" } },
+    { dark: { background: "#151411", surface: "#24221b", accent: "#d6c94a" }, light: { background: "#faf8e9", surface: "#ffffff", accent: "#8a7b13" } },
+    { dark: { background: "#0f1716", surface: "#182724", accent: "#2fb7a7" }, light: { background: "#edf8f5", surface: "#ffffff", accent: "#167d73" } },
+    { dark: { background: "#17110f", surface: "#291d19", accent: "#d8744f" }, light: { background: "#fff2ed", surface: "#ffffff", accent: "#a34522" } },
+  ];
 
   const app = {
     client: null,
@@ -63,6 +79,127 @@
 
   function profileName(profile = app.profile) {
     return profile?.display_name || profile?.username || app.user?.email || "Utente";
+  }
+
+  function normalizeThemeColor(value, fallback = "#000000") {
+    const color = String(value || "").trim();
+    return /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : fallback;
+  }
+
+  function hexToRgb(value) {
+    const color = normalizeThemeColor(value, "#000000").slice(1);
+    return {
+      r: parseInt(color.slice(0, 2), 16),
+      g: parseInt(color.slice(2, 4), 16),
+      b: parseInt(color.slice(4, 6), 16),
+    };
+  }
+
+  function rgba(value, alpha) {
+    const { r, g, b } = hexToRgb(value);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  function mixColor(value, target, amount) {
+    const from = hexToRgb(value);
+    const to = hexToRgb(target);
+    const mixed = ["r", "g", "b"].map((key) => Math.round(from[key] + (to[key] - from[key]) * amount));
+    return `#${mixed.map((part) => part.toString(16).padStart(2, "0")).join("")}`;
+  }
+
+  function normalizeThemePalette(value) {
+    const source = value && typeof value === "object" ? value : {};
+    return {
+      dark: {
+        background: normalizeThemeColor(source.dark?.background, DEFAULT_THEME_PALETTE.dark.background),
+        surface: normalizeThemeColor(source.dark?.surface, DEFAULT_THEME_PALETTE.dark.surface),
+        accent: normalizeThemeColor(source.dark?.accent, DEFAULT_THEME_PALETTE.dark.accent),
+      },
+      light: {
+        background: normalizeThemeColor(source.light?.background, DEFAULT_THEME_PALETTE.light.background),
+        surface: normalizeThemeColor(source.light?.surface, DEFAULT_THEME_PALETTE.light.surface),
+        accent: normalizeThemeColor(source.light?.accent, DEFAULT_THEME_PALETTE.light.accent),
+      },
+    };
+  }
+
+  function activeThemeMode() {
+    return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+  }
+
+  function applyThemePalette(value = app.profile?.theme_palette || DEFAULT_THEME_PALETTE) {
+    const palette = normalizeThemePalette(value);
+    const mode = activeThemeMode();
+    const colors = palette[mode];
+    const isLight = mode === "light";
+    const root = document.documentElement;
+    root.style.setProperty("--bg", colors.background);
+    root.style.setProperty("--surface", colors.surface);
+    root.style.setProperty("--surface-2", mixColor(colors.surface, isLight ? "#000000" : "#ffffff", isLight ? 0.08 : 0.07));
+    root.style.setProperty("--surface-3", mixColor(colors.surface, isLight ? "#000000" : "#ffffff", isLight ? 0.15 : 0.13));
+    root.style.setProperty("--panel-bg", rgba(colors.surface, isLight ? 0.96 : 0.92));
+    root.style.setProperty("--field-bg", rgba(isLight ? "#ffffff" : "#120f0c", isLight ? 0.96 : 0.78));
+    root.style.setProperty("--tabbar-bg", rgba(colors.background, 0.94));
+    root.style.setProperty("--gold", colors.accent);
+    root.style.setProperty("--focus", colors.accent);
+    root.style.setProperty("--focus-ring", rgba(colors.accent, 0.18));
+    root.style.setProperty("--hero-glow", rgba(colors.accent, isLight ? 0.12 : 0.18));
+    root.style.setProperty("--hero-name-border", rgba(colors.accent, isLight ? 0.45 : 0.5));
+    root.style.setProperty("--active-tab-bg", rgba(colors.accent, 0.22));
+    syncThemeControls(palette);
+    renderThemePalettePresets(palette);
+  }
+
+  function syncThemeControls(palette = normalizeThemePalette(app.profile?.theme_palette)) {
+    $$("[data-theme-mode][data-theme-token]").forEach((input) => {
+      input.value = palette[input.dataset.themeMode]?.[input.dataset.themeToken] || input.value;
+    });
+  }
+
+  function renderThemePalettePresets(activePalette = app.profile?.theme_palette || DEFAULT_THEME_PALETTE) {
+    const container = $("#themePalettePresets");
+    if (!container) return;
+    const active = JSON.stringify(normalizeThemePalette(activePalette));
+    container.innerHTML = THEME_PALETTE_PRESETS.map((palette, index) => {
+      const normalized = normalizeThemePalette(palette);
+      return `
+        <button
+          class="theme-preset ${JSON.stringify(normalized) === active ? "active" : ""}"
+          data-theme-preset="${index}"
+          style="--dark-bg: ${normalized.dark.background}; --dark-accent: ${normalized.dark.accent}; --light-bg: ${normalized.light.background}; --light-accent: ${normalized.light.accent}"
+          type="button"
+          aria-label="Usa palette ${index + 1}"
+          title="Palette ${index + 1}"
+        ><span></span><span></span></button>
+      `;
+    }).join("");
+    container.querySelectorAll("[data-theme-preset]").forEach((button) => {
+      button.addEventListener("click", () => saveThemePalette(THEME_PALETTE_PRESETS[Number(button.dataset.themePreset)]));
+    });
+  }
+
+  function paletteFromControls() {
+    const palette = normalizeThemePalette(app.profile?.theme_palette || DEFAULT_THEME_PALETTE);
+    $$("[data-theme-mode][data-theme-token]").forEach((input) => {
+      palette[input.dataset.themeMode][input.dataset.themeToken] = normalizeThemeColor(
+        input.value,
+        DEFAULT_THEME_PALETTE[input.dataset.themeMode][input.dataset.themeToken]
+      );
+    });
+    return palette;
+  }
+
+  async function saveThemePalette(value) {
+    const palette = normalizeThemePalette(value);
+    applyThemePalette(palette);
+    if (!app.user || !app.client) return;
+    const { error } = await app.client.from("profiles").update({ theme_palette: palette }).eq("id", app.user.id);
+    if (error) {
+      setStatus("Tema non salvato");
+      return;
+    }
+    app.profile = { ...(app.profile || {}), theme_palette: palette };
+    setStatus("Tema salvato");
   }
 
   function showView(viewName) {
@@ -233,12 +370,24 @@
   }
 
   async function loadProfile() {
-    const { data, error } = await app.client
+    let { data, error } = await app.client
       .from("profiles")
-      .select("id, username, display_name, role")
+      .select("id, username, display_name, role, theme_palette")
       .eq("id", app.user.id)
       .single();
+
+    if (error) {
+      const fallback = await app.client
+        .from("profiles")
+        .select("id, username, display_name, role")
+        .eq("id", app.user.id)
+        .single();
+      data = fallback.data;
+      error = fallback.error;
+    }
+
     app.profile = error ? { id: app.user.id, username: app.user.email, display_name: app.user.email, role: "user" } : data;
+    applyThemePalette(app.profile?.theme_palette || DEFAULT_THEME_PALETTE);
   }
 
   async function loadSessionsAndInvites() {
@@ -876,6 +1025,11 @@
     $("#logoutButton").addEventListener("click", signOut);
     $("#changeOwnPasswordButton").addEventListener("click", changeOwnPassword);
     $("#inviteUserSearch").addEventListener("input", debounce(searchInviteUsers, 350));
+    $$("[data-theme-mode][data-theme-token]").forEach((input) => {
+      input.addEventListener("input", () => applyThemePalette(paletteFromControls()));
+      input.addEventListener("change", () => saveThemePalette(paletteFromControls()));
+    });
+    $("#themeButton")?.addEventListener("click", () => window.setTimeout(() => applyThemePalette(), 0));
     $("#adminCreateUserButton").addEventListener("click", createAdminUser);
     $$("[data-nav-target]").forEach((button) => {
       button.addEventListener("click", () => navigate(button.dataset.navTarget));

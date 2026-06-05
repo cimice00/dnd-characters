@@ -1159,6 +1159,81 @@ summary {
   text-align: left;
 }
 
+.theme-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.theme-preset {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  min-height: 44px;
+  overflow: hidden;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 0;
+}
+
+.theme-preset span:first-child {
+  background:
+    linear-gradient(135deg, transparent 48%, var(--dark-accent) 49%),
+    var(--dark-bg);
+}
+
+.theme-preset span:last-child {
+  background:
+    linear-gradient(135deg, transparent 48%, var(--light-accent) 49%),
+    var(--light-bg);
+}
+
+.theme-preset.active {
+  border-color: var(--text);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.theme-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.theme-editor fieldset {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.theme-editor legend,
+.theme-editor span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.theme-editor label {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+}
+
+.theme-editor input {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+}
+
 .admin-page-panel details {
   background: var(--surface);
 }

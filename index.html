@@ -82,6 +82,27 @@
         <button class="small-button" id="changeOwnPasswordButton" type="button">Cambia password</button>
         <button class="small-button" id="logoutButton" type="button">Esci</button>
       </section>
+      <section class="list-panel">
+        <div class="section-title">
+          <span>Tema</span>
+          <small>Palette utente</small>
+        </div>
+        <div class="theme-preset-grid" id="themePalettePresets" aria-label="Palette tema preimpostate"></div>
+        <div class="theme-editor">
+          <fieldset>
+            <legend>Scuro</legend>
+            <label><span>Sfondo</span><input data-theme-mode="dark" data-theme-token="background" type="color" value="#17130f" /></label>
+            <label><span>Pannelli</span><input data-theme-mode="dark" data-theme-token="surface" type="color" value="#231d17" /></label>
+            <label><span>Accento</span><input data-theme-mode="dark" data-theme-token="accent" type="color" value="#d8ae5f" /></label>
+          </fieldset>
+          <fieldset>
+            <legend>Chiaro</legend>
+            <label><span>Sfondo</span><input data-theme-mode="light" data-theme-token="background" type="color" value="#f0ece4" /></label>
+            <label><span>Pannelli</span><input data-theme-mode="light" data-theme-token="surface" type="color" value="#fff8ee" /></label>
+            <label><span>Accento</span><input data-theme-mode="light" data-theme-token="accent" type="color" value="#7f5217" /></label>
+          </fieldset>
+        </div>
+      </section>
     </main>
 
     <main class="session-screen app-view" id="adminView" hidden>
