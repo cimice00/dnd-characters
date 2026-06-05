@@ -10,8 +10,9 @@ Questa app puo essere ospitata su Cloudflare Pages come sito statico. Supabase g
 4. Per la versione 1.2, esegui anche tutto il contenuto di `supabase/version-1.2.sql`.
 5. Per la versione 1.3, esegui anche tutto il contenuto di `supabase/version-1.3.sql`.
 6. Per la versione 1.4, esegui anche tutto il contenuto di `supabase/version-1.4.sql`.
-7. In `Authentication > Providers`, abilita almeno Email.
-8. In `Authentication > URL Configuration`, aggiungi l'URL Cloudflare Pages quando sara disponibile.
+7. Per la versione 1.5, esegui anche tutto il contenuto di `supabase/version-1.5.sql`.
+8. In `Authentication > Providers`, abilita almeno Email.
+9. In `Authentication > URL Configuration`, aggiungi l'URL Cloudflare Pages quando sara disponibile.
 
 Lo schema include:
 
@@ -148,3 +149,10 @@ La versione 1.4 aggiunge:
 - apertura della scheda completa in sola lettura dalla vista master;
 - palette tema personale salvata nel profilo Supabase;
 - colori separati per tema scuro e chiaro: sfondo, pannelli e accento.
+
+## 8. Versione 1.5
+
+La versione 1.5 aggiunge:
+
+- colore personalizzabile per testi secondari e label in maiuscolo;
+- migrazione delle palette esistenti da 3 a 4 colori per tema.

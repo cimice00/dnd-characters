@@ -3,22 +3,22 @@
   const SESSION_ID_KEY = "dnd-mobile-session-id-v1";
   const CHARACTER_ID_KEY = "dnd-mobile-character-id-v1";
   const MASTER_PREVIEW_KEY = "dnd-master-character-preview-v1";
-  const APP_VERSION = "1.4.0";
+  const APP_VERSION = "1.5.0";
   const DEFAULT_THEME_PALETTE = {
-    dark: { background: "#17130f", surface: "#231d17", accent: "#d8ae5f" },
-    light: { background: "#f0ece4", surface: "#fff8ee", accent: "#7f5217" },
+    dark: { background: "#17130f", surface: "#231d17", accent: "#d8ae5f", muted: "#b9aa99" },
+    light: { background: "#f0ece4", surface: "#fff8ee", accent: "#7f5217", muted: "#766755" },
   };
   const THEME_PALETTE_PRESETS = [
     DEFAULT_THEME_PALETTE,
-    { dark: { background: "#10161b", surface: "#19242c", accent: "#63b3c2" }, light: { background: "#eef7f6", surface: "#ffffff", accent: "#217985" } },
-    { dark: { background: "#151017", surface: "#24192a", accent: "#c084fc" }, light: { background: "#f7f0fb", surface: "#ffffff", accent: "#7e3bb2" } },
-    { dark: { background: "#10170f", surface: "#1b2618", accent: "#84cc6a" }, light: { background: "#f1f7ed", surface: "#ffffff", accent: "#4b842f" } },
-    { dark: { background: "#190f12", surface: "#2a181d", accent: "#f06a7a" }, light: { background: "#fff0f2", surface: "#ffffff", accent: "#b93649" } },
-    { dark: { background: "#14110e", surface: "#251d16", accent: "#f59e42" }, light: { background: "#fff6eb", surface: "#ffffff", accent: "#9a5a16" } },
-    { dark: { background: "#0f141d", surface: "#182133", accent: "#7aa7ff" }, light: { background: "#eef3ff", surface: "#ffffff", accent: "#2f62bd" } },
-    { dark: { background: "#151411", surface: "#24221b", accent: "#d6c94a" }, light: { background: "#faf8e9", surface: "#ffffff", accent: "#8a7b13" } },
-    { dark: { background: "#0f1716", surface: "#182724", accent: "#2fb7a7" }, light: { background: "#edf8f5", surface: "#ffffff", accent: "#167d73" } },
-    { dark: { background: "#17110f", surface: "#291d19", accent: "#d8744f" }, light: { background: "#fff2ed", surface: "#ffffff", accent: "#a34522" } },
+    { dark: { background: "#10161b", surface: "#19242c", accent: "#63b3c2", muted: "#9fc3c8" }, light: { background: "#eef7f6", surface: "#ffffff", accent: "#217985", muted: "#477f86" } },
+    { dark: { background: "#151017", surface: "#24192a", accent: "#c084fc", muted: "#c9addb" }, light: { background: "#f7f0fb", surface: "#ffffff", accent: "#7e3bb2", muted: "#8757a8" } },
+    { dark: { background: "#10170f", surface: "#1b2618", accent: "#84cc6a", muted: "#accda2" }, light: { background: "#f1f7ed", surface: "#ffffff", accent: "#4b842f", muted: "#628b50" } },
+    { dark: { background: "#190f12", surface: "#2a181d", accent: "#f06a7a", muted: "#e5a8af" }, light: { background: "#fff0f2", surface: "#ffffff", accent: "#b93649", muted: "#a54e5b" } },
+    { dark: { background: "#14110e", surface: "#251d16", accent: "#f59e42", muted: "#dbb07a" }, light: { background: "#fff6eb", surface: "#ffffff", accent: "#9a5a16", muted: "#915d25" } },
+    { dark: { background: "#0f141d", surface: "#182133", accent: "#7aa7ff", muted: "#a8c1ef" }, light: { background: "#eef3ff", surface: "#ffffff", accent: "#2f62bd", muted: "#526fa8" } },
+    { dark: { background: "#151411", surface: "#24221b", accent: "#d6c94a", muted: "#d0c985" }, light: { background: "#faf8e9", surface: "#ffffff", accent: "#8a7b13", muted: "#807726" } },
+    { dark: { background: "#0f1716", surface: "#182724", accent: "#2fb7a7", muted: "#9cc9c2" }, light: { background: "#edf8f5", surface: "#ffffff", accent: "#167d73", muted: "#3c857d" } },
+    { dark: { background: "#17110f", surface: "#291d19", accent: "#d8744f", muted: "#d5a08b" }, light: { background: "#fff2ed", surface: "#ffffff", accent: "#a34522", muted: "#9a5234" } },
   ];
 
   const app = {
@@ -114,11 +114,13 @@
         background: normalizeThemeColor(source.dark?.background, DEFAULT_THEME_PALETTE.dark.background),
         surface: normalizeThemeColor(source.dark?.surface, DEFAULT_THEME_PALETTE.dark.surface),
         accent: normalizeThemeColor(source.dark?.accent, DEFAULT_THEME_PALETTE.dark.accent),
+        muted: normalizeThemeColor(source.dark?.muted, DEFAULT_THEME_PALETTE.dark.muted),
       },
       light: {
         background: normalizeThemeColor(source.light?.background, DEFAULT_THEME_PALETTE.light.background),
         surface: normalizeThemeColor(source.light?.surface, DEFAULT_THEME_PALETTE.light.surface),
         accent: normalizeThemeColor(source.light?.accent, DEFAULT_THEME_PALETTE.light.accent),
+        muted: normalizeThemeColor(source.light?.muted, DEFAULT_THEME_PALETTE.light.muted),
       },
     };
   }
@@ -143,6 +145,7 @@
     root.style.setProperty("--tabbar-bg", rgba(colors.background, 0.94));
     root.style.setProperty("--gold", colors.accent);
     root.style.setProperty("--focus", colors.accent);
+    root.style.setProperty("--muted", colors.muted);
     root.style.setProperty("--line", rgba(colors.accent, isLight ? 0.34 : 0.32));
     root.style.setProperty("--hero-border", rgba(colors.accent, isLight ? 0.44 : 0.36));
     root.style.setProperty("--focus-ring", rgba(colors.accent, 0.18));
@@ -173,7 +176,7 @@
         <button
           class="theme-preset ${JSON.stringify(normalized) === active ? "active" : ""}"
           data-theme-preset="${index}"
-          style="--dark-bg: ${normalized.dark.background}; --dark-accent: ${normalized.dark.accent}; --light-bg: ${normalized.light.background}; --light-accent: ${normalized.light.accent}"
+          style="--dark-bg: ${normalized.dark.background}; --dark-accent: ${normalized.dark.accent}; --dark-muted: ${normalized.dark.muted}; --light-bg: ${normalized.light.background}; --light-accent: ${normalized.light.accent}; --light-muted: ${normalized.light.muted}"
           type="button"
           aria-label="Usa palette ${index + 1}"
           title="Palette ${index + 1}"

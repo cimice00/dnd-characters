@@ -1187,13 +1187,13 @@ summary {
 
 .theme-preset span:first-child {
   background:
-    linear-gradient(135deg, transparent 48%, var(--dark-accent) 49%),
+    linear-gradient(135deg, transparent 40%, var(--dark-accent) 41% 60%, var(--dark-muted) 61%),
     var(--dark-bg);
 }
 
 .theme-preset span:last-child {
   background:
-    linear-gradient(135deg, transparent 48%, var(--light-accent) 49%),
+    linear-gradient(135deg, transparent 40%, var(--light-accent) 41% 60%, var(--light-muted) 61%),
     var(--light-bg);
 }
 
@@ -1209,7 +1209,7 @@ summary {
 
 .theme-editor fieldset {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin: 0;
   padding: 10px;
