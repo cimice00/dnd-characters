@@ -16,4 +16,5 @@ Per pubblicare l'app su Cloudflare Pages e collegarla a Supabase, leggi `INFRAST
 - Sei caratteristiche con modificatore calcolato.
 - Tiri salvezza, abilita, percezione passiva e ispirazione.
 - Slot incantesimo, equipaggiamento, monete, storia e note.
-- Prima bozza di messaggio dal master e condivisione della scheda.
+- Database locale di incantesimi con filtri per classe, livello e fonte.
+- Incantesimi custom aggiungibili e rimovibili.
