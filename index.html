@@ -7,7 +7,6 @@
     <title>Compendio Personaggi D&D</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="styles-v12.css" />
   </head>
   <body>
     <button class="icon-button theme-button floating-theme-button" id="themeButton" type="button" title="Cambia tema" aria-label="Cambia tema">&#9680;</button>
@@ -445,65 +444,6 @@
         <button class="drawer-nav-button" data-nav-target="sessions" type="button">Sessioni</button>
         <button class="drawer-nav-button" data-nav-target="settings" type="button">Impostazioni</button>
         <button class="drawer-nav-button" data-nav-target="admin" id="adminNavButton" type="button" hidden>Amministrazione</button>
-      </section>
-
-      <section class="drawer-section">
-        <div class="section-title compact-title">
-          <span>Account</span>
-          <small id="syncStatus">Non connesso</small>
-        </div>
-        <p class="muted-line" id="drawerUserEmail"></p>
-        <label class="field">
-          <span>Nuova password</span>
-          <input id="ownNewPassword" type="password" autocomplete="new-password" />
-        </label>
-        <button class="small-button" id="changeOwnPasswordButton" type="button">Cambia password</button>
-        <button class="small-button" id="logoutButton" type="button">Esci</button>
-      </section>
-
-      <section class="drawer-section">
-        <div class="section-title compact-title">
-          <span>Sessione</span>
-          <small id="currentSessionRole">-</small>
-        </div>
-        <button class="small-button" id="backToSessionsButton" type="button">Torna alle sessioni</button>
-        <div class="session-master-tools" id="sessionMasterTools" hidden>
-          <label class="field">
-            <span>Invita utente</span>
-            <input id="inviteUserSearch" type="search" autocomplete="off" placeholder="Cerca username" />
-          </label>
-          <div class="search-results" id="inviteUserResults"></div>
-        </div>
-      </section>
-
-      <section class="drawer-section">
-        <div class="section-title compact-title">
-          <span>Inviti</span>
-          <small id="drawerInviteCount">0</small>
-        </div>
-        <div class="invite-list compact" id="drawerInviteList"></div>
-      </section>
-
-      <section class="drawer-section admin-panel" id="adminPanel" hidden>
-        <div class="section-title compact-title">
-          <span>Admin</span>
-          <small>Controllo</small>
-        </div>
-        <details open>
-          <summary>Account</summary>
-          <div class="admin-form">
-            <label class="field"><span>Email</span><input id="adminNewUserEmail" type="email" autocomplete="off" /></label>
-            <label class="field"><span>Username</span><input id="adminNewUsername" type="text" autocomplete="off" /></label>
-            <label class="field"><span>Nome</span><input id="adminNewDisplayName" type="text" autocomplete="off" /></label>
-            <label class="field"><span>Password</span><input id="adminNewPassword" type="password" autocomplete="new-password" /></label>
-            <button class="small-button" id="adminCreateUserButton" type="button">Crea account</button>
-          </div>
-          <div class="admin-list" id="adminUsersList"></div>
-        </details>
-        <details>
-          <summary>Sessioni</summary>
-          <div class="admin-list" id="adminSessionsList"></div>
-        </details>
       </section>
     </aside>
 
