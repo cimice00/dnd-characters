@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="styles-v12.css" />
   </head>
   <body>
+    <button class="icon-button theme-button floating-theme-button" id="themeButton" type="button" title="Cambia tema" aria-label="Cambia tema">&#9680;</button>
+
     <main class="auth-screen app-view" id="authView">
       <section class="auth-card">
         <div class="brand-block">
@@ -60,6 +62,86 @@
       </section>
     </main>
 
+    <main class="session-screen app-view" id="settingsView" hidden>
+      <header class="screen-topbar">
+        <div>
+          <span>Impostazioni</span>
+          <strong>Account</strong>
+        </div>
+        <button class="icon-button" data-menu-button type="button" title="Menu" aria-label="Menu">&#9776;</button>
+      </header>
+      <section class="list-panel">
+        <div class="section-title">
+          <span>Account</span>
+          <small id="syncStatus">Non connesso</small>
+        </div>
+        <p class="muted-line" id="settingsUserEmail"></p>
+        <label class="field">
+          <span>Nuova password</span>
+          <input id="ownNewPassword" type="password" autocomplete="new-password" />
+        </label>
+        <button class="small-button" id="changeOwnPasswordButton" type="button">Cambia password</button>
+        <button class="small-button" id="logoutButton" type="button">Esci</button>
+      </section>
+    </main>
+
+    <main class="session-screen app-view" id="adminView" hidden>
+      <header class="screen-topbar">
+        <div>
+          <span>Amministrazione</span>
+          <strong>Controllo app</strong>
+        </div>
+        <button class="icon-button" data-menu-button type="button" title="Menu" aria-label="Menu">&#9776;</button>
+      </header>
+      <section class="list-panel admin-page-panel">
+        <details open>
+          <summary>Account</summary>
+          <div class="admin-form">
+            <label class="field"><span>Email</span><input id="adminNewUserEmail" type="email" autocomplete="off" /></label>
+            <label class="field"><span>Username</span><input id="adminNewUsername" type="text" autocomplete="off" /></label>
+            <label class="field"><span>Nome</span><input id="adminNewDisplayName" type="text" autocomplete="off" /></label>
+            <label class="field"><span>Password</span><input id="adminNewPassword" type="password" autocomplete="new-password" /></label>
+            <button class="small-button" id="adminCreateUserButton" type="button">Crea account</button>
+          </div>
+          <div class="admin-list" id="adminUsersList"></div>
+        </details>
+      </section>
+      <section class="list-panel admin-page-panel">
+        <details open>
+          <summary>Sessioni</summary>
+          <div class="admin-list" id="adminSessionsList"></div>
+        </details>
+      </section>
+    </main>
+
+    <main class="session-screen app-view" id="masterView" hidden>
+      <header class="screen-topbar">
+        <div>
+          <span>Sessione master</span>
+          <strong data-session-name>La Miniera Perduta</strong>
+        </div>
+        <button class="icon-button" data-menu-button type="button" title="Menu" aria-label="Menu">&#9776;</button>
+      </header>
+      <section class="list-panel">
+        <div class="section-title">
+          <span>Partecipanti</span>
+          <small id="masterCharacterCount">0</small>
+        </div>
+        <div class="master-character-list" id="masterCharacterList"></div>
+      </section>
+      <section class="list-panel">
+        <div class="section-title">
+          <span>Invita utente</span>
+          <small>username</small>
+        </div>
+        <label class="field">
+          <span>Cerca</span>
+          <input id="inviteUserSearch" type="search" autocomplete="off" placeholder="Cerca username" />
+        </label>
+        <div class="search-results" id="inviteUserResults"></div>
+      </section>
+    </main>
+
     <main class="app-shell app-view" id="characterView" hidden>
       <header class="topbar">
         <button class="icon-button" id="menuButton" type="button" title="Menu" aria-label="Menu">&#9776;</button>
@@ -67,7 +149,6 @@
           <span>Sessione</span>
           <strong data-session-name>La Miniera Perduta</strong>
         </div>
-        <button class="icon-button theme-button" id="themeButton" type="button" title="Cambia tema" aria-label="Cambia tema">&#9680;</button>
       </header>
 
       <section class="hero">
@@ -359,6 +440,13 @@
         <button class="icon-button" id="closeDrawerButton" type="button" title="Chiudi" aria-label="Chiudi">×</button>
       </header>
 
+      <section class="drawer-section nav-section">
+        <p class="muted-line" id="drawerUserEmail"></p>
+        <button class="drawer-nav-button" data-nav-target="sessions" type="button">Sessioni</button>
+        <button class="drawer-nav-button" data-nav-target="settings" type="button">Impostazioni</button>
+        <button class="drawer-nav-button" data-nav-target="admin" id="adminNavButton" type="button" hidden>Amministrazione</button>
+      </section>
+
       <section class="drawer-section">
         <div class="section-title compact-title">
           <span>Account</span>
@@ -423,6 +511,6 @@
     <script src="spells-db.js"></script>
     <script src="supabase-config.js"></script>
     <script src="app.js"></script>
-    <script src="app-v12.js"></script>
+    <script src="app-v13.js"></script>
   </body>
 </html>
