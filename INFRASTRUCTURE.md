@@ -61,7 +61,28 @@ SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_OR_PUBLISHABLE_KEY
 
 La chiave anon/publishable di Supabase puo stare nel frontend: la protezione vera e' nelle policy RLS del database.
 
-## 3. Sviluppo locale
+7. Salva e rilancia il deploy. A fine build Cloudflare deve generare `supabase-config.js` con i valori Supabase reali.
+
+URL di test attuale:
+
+```text
+https://dnd-characters.united2-9999.workers.dev/
+```
+
+## 3. Auth Supabase
+
+Per testare login e salvataggio:
+
+1. In `Authentication > Providers`, abilita Email.
+2. In `Authentication > URL Configuration`, imposta come Site URL:
+
+```text
+https://dnd-characters.united2-9999.workers.dev/
+```
+
+3. Aggiungi lo stesso URL anche tra i Redirect URLs consentiti.
+
+## 4. Sviluppo locale
 
 Per generare il file di configurazione in locale:
 
@@ -81,9 +102,9 @@ node scripts/build-config.mjs
 
 Poi apri `index.html` o avvia un server locale.
 
-## 4. Prossimo passo applicativo
+## 5. Versione 1.1
 
-Il prossimo sviluppo e' collegare `app.js` a Supabase:
+La versione 1.1 collega `app.js` a Supabase:
 
 - login/logout;
 - creazione sessione;
