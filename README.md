@@ -2,7 +2,7 @@
 
 Primo prototipo mobile della schermata personaggio.
 
-Versione app: `1.1.0`
+Versione app: `1.2.0`
 
 Apri `index.html` nel browser per provarlo. I dati vengono salvati automaticamente nel browser del dispositivo.
 
@@ -21,3 +21,4 @@ Per pubblicare l'app su Cloudflare Pages e collegarla a Supabase, leggi `INFRAST
 - Database locale di incantesimi con filtri per classe, livello e fonte.
 - Incantesimi custom aggiungibili e rimovibili.
 - Collegamento Supabase per login, sessioni e salvataggio scheda.
+- Pagina login iniziale, pagina sessioni, inviti e pannello admin.
