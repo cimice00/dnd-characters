@@ -1257,6 +1257,44 @@ summary {
   font-weight: 800;
 }
 
+.master-card-actions,
+.read-only-notice {
+  display: grid;
+  gap: 10px;
+  align-items: center;
+}
+
+.master-card-actions {
+  grid-template-columns: 1fr auto;
+}
+
+.read-only-notice {
+  grid-template-columns: 1fr auto;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.read-only-notice span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.read-only-notice strong {
+  display: block;
+  margin-top: 3px;
+}
+
+.read-only-sheet input,
+.read-only-sheet textarea,
+.read-only-sheet select {
+  opacity: 0.82;
+}
+
 @media (min-width: 760px) {
   .app-shell {
     padding-inline: 16px;

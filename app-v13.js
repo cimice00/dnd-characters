@@ -2,6 +2,7 @@
   const STORAGE_KEY = "dnd-mobile-character-v1";
   const SESSION_ID_KEY = "dnd-mobile-session-id-v1";
   const CHARACTER_ID_KEY = "dnd-mobile-character-id-v1";
+  const MASTER_PREVIEW_KEY = "dnd-master-character-preview-v1";
   const APP_VERSION = "1.3.0";
 
   const app = {
@@ -16,6 +17,7 @@
     masterChannel: null,
     saveTimer: null,
     config: window.DND_APP_CONFIG || {},
+    readOnlyCharacter: false,
   };
 
   const $ = (selector) => document.querySelector(selector);
@@ -31,6 +33,14 @@
 
   function setState(nextState) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+  }
+
+  function masterPreview() {
+    try {
+      return JSON.parse(localStorage.getItem(MASTER_PREVIEW_KEY)) || null;
+    } catch {
+      return null;
+    }
   }
 
   function selectedSessionId() {
@@ -68,6 +78,7 @@
       const element = document.getElementById(id);
       if (element) element.hidden = id !== viewIds[viewName];
     });
+    if (viewName !== "character") setCharacterReadOnly(false);
     if (viewName !== "master") stopMasterRealtime();
   }
 
@@ -293,7 +304,14 @@
     }
 
     setSessionTitle(app.currentSession.name);
+    const preview = masterPreview();
     if (app.currentRole === "master" || app.profile?.role === "admin") {
+      if (preview?.sessionId === app.currentSession.id) {
+        app.readOnlyCharacter = true;
+        setCharacterReadOnly(true, preview);
+        showView("character");
+        return;
+      }
       await openMasterDashboard(app.currentSession);
       return;
     }
@@ -322,6 +340,7 @@
     if (target === "sessions") {
       localStorage.removeItem(SESSION_ID_KEY);
       localStorage.removeItem(CHARACTER_ID_KEY);
+      localStorage.removeItem(MASTER_PREVIEW_KEY);
       await refreshShellData();
       showView("sessions");
     }
@@ -400,7 +419,7 @@
   }
 
   function queueCharacterSave() {
-    if (!app.user || !app.currentSession || app.currentRole === "master") return;
+    if (!app.user || !app.currentSession || app.currentRole === "master" || app.readOnlyCharacter) return;
     window.clearTimeout(app.saveTimer);
     app.saveTimer = window.setTimeout(saveCharacter, 900);
   }
@@ -408,7 +427,7 @@
   async function saveCharacter() {
     const sessionId = selectedSessionId();
     const characterId = selectedCharacterId();
-    if (!app.user || !sessionId || !characterId || app.currentRole === "master") return;
+    if (!app.user || !sessionId || !characterId || app.currentRole === "master" || app.readOnlyCharacter) return;
     const state = { ...getState(), activeSessionId: sessionId, appVersion: APP_VERSION };
     const { error } = await app.client
       .from("characters")
@@ -481,6 +500,9 @@
     list.innerHTML = app.masterCharacters.length
       ? app.masterCharacters.map(renderMasterCharacterCard).join("")
       : `<div class="empty-state">Nessun personaggio nella sessione.</div>`;
+    list.querySelectorAll("[data-open-character-sheet]").forEach((button) => {
+      button.addEventListener("click", () => openCharacterPreview(button.dataset.openCharacterSheet));
+    });
   }
 
   function renderMasterCharacterCard(character) {
@@ -509,9 +531,82 @@
           <span>CA <strong>${escapeHtml(data.armorClass ?? "-")}</strong></span>
           <span>TS morte <strong>${Number(data.deathSuccesses) || 0}/${Number(data.deathFailures) || 0}</strong></span>
         </div>
-        <small class="live-line">Aggiornato ${formatTime(character.updated_at)}</small>
+        <div class="master-card-actions">
+          <small class="live-line">Aggiornato ${formatTime(character.updated_at)}</small>
+          <button class="small-button" data-open-character-sheet="${escapeAttribute(character.id)}" type="button">Apri scheda</button>
+        </div>
       </article>
     `;
+  }
+
+  function openCharacterPreview(characterId) {
+    const character = app.masterCharacters.find((item) => item.id === characterId);
+    if (!character || !app.currentSession) return;
+    const characterState = {
+      ...(character.data || {}),
+      activeSessionId: app.currentSession.id,
+      session: app.currentSession.name,
+      appVersion: APP_VERSION,
+    };
+    setState(characterState);
+    localStorage.setItem(SESSION_ID_KEY, app.currentSession.id);
+    localStorage.setItem(CHARACTER_ID_KEY, character.id);
+    localStorage.setItem(
+      MASTER_PREVIEW_KEY,
+      JSON.stringify({
+        sessionId: app.currentSession.id,
+        characterId: character.id,
+        characterName: characterState.name || character.name || "Personaggio senza nome",
+      })
+    );
+    window.location.reload();
+  }
+
+  async function closeCharacterPreview() {
+    localStorage.removeItem(MASTER_PREVIEW_KEY);
+    localStorage.removeItem(CHARACTER_ID_KEY);
+    app.readOnlyCharacter = false;
+    setCharacterReadOnly(false);
+    if (app.currentSession) {
+      await openMasterDashboard(app.currentSession);
+    } else {
+      await routeAfterAuth();
+    }
+  }
+
+  function setCharacterReadOnly(readOnly, preview = masterPreview()) {
+    app.readOnlyCharacter = Boolean(readOnly);
+    const view = $("#characterView");
+    if (!view) return;
+    view.classList.toggle("read-only-sheet", app.readOnlyCharacter);
+    view.querySelectorAll("input, textarea, select").forEach((field) => {
+      field.disabled = app.readOnlyCharacter;
+    });
+    view.querySelectorAll("button").forEach((button) => {
+      if (button.id === "menuButton" || button.classList.contains("tab-button")) return;
+      button.disabled = app.readOnlyCharacter;
+    });
+
+    let notice = $("#readOnlySheetNotice");
+    if (app.readOnlyCharacter) {
+      if (!notice) {
+        notice = document.createElement("section");
+        notice.id = "readOnlySheetNotice";
+        notice.className = "read-only-notice";
+        const hero = view.querySelector(".hero");
+        view.insertBefore(notice, hero || view.firstChild);
+      }
+      notice.innerHTML = `
+        <div>
+          <span>Sola visualizzazione</span>
+          <strong>${escapeHtml(preview?.characterName || "Scheda personaggio")}</strong>
+        </div>
+        <button class="small-button" id="closeReadOnlySheetButton" type="button">Torna al master</button>
+      `;
+      $("#closeReadOnlySheetButton")?.addEventListener("click", closeCharacterPreview);
+    } else if (notice) {
+      notice.remove();
+    }
   }
 
   function subscribeMasterCharacters(sessionId) {
@@ -762,6 +857,7 @@
     app.masterCharacters = [];
     localStorage.removeItem(SESSION_ID_KEY);
     localStorage.removeItem(CHARACTER_ID_KEY);
+    localStorage.removeItem(MASTER_PREVIEW_KEY);
     closeDrawer();
     showView("auth");
   }
@@ -801,6 +897,10 @@
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;");
+  }
+
+  function escapeAttribute(value) {
+    return escapeHtml(value).replaceAll('"', "&quot;");
   }
 
   function formatTime(value) {
