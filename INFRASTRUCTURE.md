@@ -7,8 +7,9 @@ Questa app puo essere ospitata su Cloudflare Pages come sito statico. Supabase g
 1. Crea un nuovo progetto su Supabase.
 2. Apri `SQL Editor`.
 3. Esegui tutto il contenuto di `supabase/schema.sql`.
-4. In `Authentication > Providers`, abilita almeno Email.
-5. In `Authentication > URL Configuration`, aggiungi l'URL Cloudflare Pages quando sara disponibile.
+4. Per la versione 1.2, esegui anche tutto il contenuto di `supabase/version-1.2.sql`.
+5. In `Authentication > Providers`, abilita almeno Email.
+6. In `Authentication > URL Configuration`, aggiungi l'URL Cloudflare Pages quando sara disponibile.
 
 Lo schema include:
 
@@ -18,8 +19,22 @@ Lo schema include:
 - `characters`
 - `custom_spells`
 - `master_messages`
+- `session_invites`
 
 Tutte le tabelle principali hanno Row Level Security attiva.
+
+## 1.1 Admin iniziale
+
+Per creare l'admin iniziale:
+
+1. Crea un utente da Supabase Authentication con email e password di test.
+2. Esegui questa query nel SQL Editor, sostituendo l'email:
+
+```sql
+select public.bootstrap_admin('admin@example.com', 'Admin', 'Admin');
+```
+
+Per sicurezza cambia subito la password dall'app dopo il primo accesso.
 
 ## 2. Cloudflare Pages
 
@@ -102,12 +117,12 @@ node scripts/build-config.mjs
 
 Poi apri `index.html` o avvia un server locale.
 
-## 5. Versione 1.1
+## 5. Versione 1.2
 
-La versione 1.1 collega `app.js` a Supabase:
+La versione 1.2 organizza l'app cosi:
 
-- login/logout;
-- creazione sessione;
-- salvataggio personaggio in `characters.data`;
-- sync degli incantesimi custom in `custom_spells`;
-- lettura messaggi master da `master_messages`.
+- login come prima schermata;
+- pagina sessioni attive e inviti;
+- scheda personaggio solo dopo scelta sessione;
+- menu laterale per password, inviti e strumenti master;
+- pannello admin per account, ruoli e sessioni.
