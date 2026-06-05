@@ -8,8 +8,9 @@ Questa app puo essere ospitata su Cloudflare Pages come sito statico. Supabase g
 2. Apri `SQL Editor`.
 3. Esegui tutto il contenuto di `supabase/schema.sql`.
 4. Per la versione 1.2, esegui anche tutto il contenuto di `supabase/version-1.2.sql`.
-5. In `Authentication > Providers`, abilita almeno Email.
-6. In `Authentication > URL Configuration`, aggiungi l'URL Cloudflare Pages quando sara disponibile.
+5. Per la versione 1.3, esegui anche tutto il contenuto di `supabase/version-1.3.sql`.
+6. In `Authentication > Providers`, abilita almeno Email.
+7. In `Authentication > URL Configuration`, aggiungi l'URL Cloudflare Pages quando sara disponibile.
 
 Lo schema include:
 
@@ -126,3 +127,15 @@ La versione 1.2 organizza l'app cosi:
 - scheda personaggio solo dopo scelta sessione;
 - menu laterale per password, inviti e strumenti master;
 - pannello admin per account, ruoli e sessioni.
+
+## 6. Versione 1.3
+
+La versione 1.3 aggiunge:
+
+- menu laterale come navigazione;
+- pagina Sessioni;
+- pagina Impostazioni;
+- pagina Amministrazione solo per admin;
+- pulsante tema sempre disponibile;
+- vista master senza scheda personaggio;
+- stato live dei personaggi della sessione tramite Supabase Realtime.
