@@ -19,6 +19,53 @@
         <button class="icon-button theme-button" id="themeButton" type="button" title="Cambia tema" aria-label="Cambia tema">&#9680;</button>
       </header>
 
+      <details class="sync-panel" id="syncPanel">
+        <summary>
+          <span>Account e database</span>
+          <small id="syncStatus">Solo dispositivo</small>
+        </summary>
+        <div class="sync-body">
+          <div class="auth-box" id="authSignedOut">
+            <label class="field">
+              <span>Email</span>
+              <input id="authEmail" type="email" autocomplete="email" />
+            </label>
+            <label class="field">
+              <span>Password</span>
+              <input id="authPassword" type="password" autocomplete="current-password" />
+            </label>
+            <div class="sync-actions">
+              <button class="small-button" id="loginButton" type="button">Entra</button>
+              <button class="small-button" id="signupButton" type="button">Crea account</button>
+            </div>
+          </div>
+
+          <div class="auth-box" id="authSignedIn" hidden>
+            <div class="account-line">
+              <span id="accountEmail">Non connesso</span>
+              <button class="small-button" id="logoutButton" type="button">Esci</button>
+            </div>
+            <label class="field">
+              <span>Nome sessione</span>
+              <input id="sessionNameInput" type="text" autocomplete="off" />
+            </label>
+            <div class="sync-actions">
+              <button class="small-button" id="createSessionButton" type="button">Crea / apri sessione</button>
+              <button class="small-button" id="saveCloudButton" type="button">Salva ora</button>
+            </div>
+            <section class="master-message-box">
+              <div class="section-title compact-title">
+                <span>Messaggi master</span>
+                <small id="masterMessageCount">0</small>
+              </div>
+              <div id="masterMessages" class="master-message-list">
+                <div class="empty-state">Nessun messaggio.</div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </details>
+
       <section class="hero">
         <div class="hero-ring" aria-hidden="true"></div>
         <label class="field hero-name">
@@ -298,6 +345,7 @@
 
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="spells-db.js"></script>
     <script src="supabase-config.js"></script>
     <script src="app.js"></script>
