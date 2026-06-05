@@ -38,7 +38,21 @@ node scripts/build-config.mjs
 .
 ```
 
-6. Aggiungi queste Environment Variables in Cloudflare Pages:
+6. Aggiungi queste variabili nella sezione di build di Cloudflare Pages.
+
+Importante: se Cloudflare mostra il messaggio "Variables cannot be added to a Worker that only has static assets", sei nella sezione sbagliata. Non aggiungerle nelle variabili runtime del Worker statico. Devi inserirle nella configurazione di build del progetto Pages:
+
+```text
+Settings > Environment variables
+```
+
+oppure, nella nuova interfaccia Workers/Pages:
+
+```text
+Settings > Builds > Build variables and secrets
+```
+
+Variabili da aggiungere:
 
 ```text
 SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
