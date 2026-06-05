@@ -1,0 +1,209 @@
+.app-view[hidden],
+[hidden] {
+  display: none !important;
+}
+
+.auth-screen,
+.session-screen {
+  width: min(100%, 520px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: calc(18px + env(safe-area-inset-top)) 14px calc(32px + env(safe-area-inset-bottom));
+}
+
+.auth-screen {
+  display: grid;
+  align-items: center;
+}
+
+.auth-card,
+.session-create-panel,
+.list-panel,
+.drawer-section {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-bg);
+}
+
+.auth-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.brand-block {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.brand-block span,
+.screen-topbar span,
+.drawer-header span,
+.muted-line {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.brand-block h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: 34px;
+  line-height: 1;
+}
+
+.primary-button {
+  min-height: 46px;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius);
+  background: var(--gold);
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.view-status {
+  min-height: 20px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.session-screen {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.screen-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 1fr 44px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0 10px;
+  background: linear-gradient(180deg, var(--bg) 74%, transparent);
+}
+
+.screen-topbar > div,
+.drawer-header > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.screen-topbar strong,
+.drawer-header strong {
+  overflow: hidden;
+  font-size: 19px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-create-panel,
+.list-panel,
+.drawer-section {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.session-list,
+.invite-list,
+.search-results,
+.admin-list {
+  display: grid;
+  gap: 8px;
+}
+
+.session-card,
+.invite-card,
+.user-row,
+.admin-row {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.session-card {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.session-card small,
+.invite-card small,
+.user-row small,
+.admin-row small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.invite-card-actions,
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.side-drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 90;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 10px;
+  width: min(92vw, 420px);
+  overflow-y: auto;
+  padding: calc(12px + env(safe-area-inset-top)) 12px calc(18px + env(safe-area-inset-bottom));
+  border-left: 1px solid var(--line);
+  background: var(--bg);
+  box-shadow: -22px 0 60px rgba(0, 0, 0, 0.34);
+}
+
+.drawer-header {
+  display: grid;
+  grid-template-columns: 1fr 44px;
+  gap: 10px;
+  align-items: center;
+}
+
+.muted-line {
+  margin: 0;
+  text-transform: none;
+}
+
+.session-master-tools {
+  display: grid;
+  gap: 10px;
+}
+
+.invite-list.compact .invite-card {
+  font-size: 13px;
+}
+
+.admin-panel details {
+  background: var(--surface);
+}
+
+.admin-form {
+  display: grid;
+  gap: 10px;
+  padding: 0 10px 10px;
+}
