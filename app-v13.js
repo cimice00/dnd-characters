@@ -20,6 +20,42 @@
     { dark: { background: "#0f1716", surface: "#182724", accent: "#2fb7a7", muted: "#9cc9c2" }, light: { background: "#edf8f5", surface: "#ffffff", accent: "#167d73", muted: "#3c857d" } },
     { dark: { background: "#17110f", surface: "#291d19", accent: "#d8744f", muted: "#d5a08b" }, light: { background: "#fff2ed", surface: "#ffffff", accent: "#a34522", muted: "#9a5234" } },
   ];
+  const PDF_ABILITIES = [
+    ["strength", "Forza"],
+    ["dexterity", "Destrezza"],
+    ["constitution", "Costituzione"],
+    ["intelligence", "Intelligenza"],
+    ["wisdom", "Saggezza"],
+    ["charisma", "Carisma"],
+  ];
+  const PDF_SAVES = [
+    ["strength", "Forza"],
+    ["dexterity", "Destrezza"],
+    ["constitution", "Costituzione"],
+    ["intelligence", "Intelligenza"],
+    ["wisdom", "Saggezza"],
+    ["charisma", "Carisma"],
+  ];
+  const PDF_SKILLS = [
+    ["acrobatics", "Acrobazia"],
+    ["animalHandling", "Addestrare Animali"],
+    ["arcana", "Arcano"],
+    ["athletics", "Atletica"],
+    ["deception", "Inganno"],
+    ["history", "Storia"],
+    ["insight", "Intuizione"],
+    ["intimidation", "Intimidire"],
+    ["investigation", "Indagare"],
+    ["medicine", "Medicina"],
+    ["nature", "Natura"],
+    ["perception", "Percezione"],
+    ["performance", "Intrattenere"],
+    ["persuasion", "Persuasione"],
+    ["religion", "Religione"],
+    ["sleightOfHand", "Rapidita di Mano"],
+    ["stealth", "Furtivita"],
+    ["survival", "Sopravvivenza"],
+  ];
 
   const app = {
     client: null,
@@ -377,6 +413,8 @@
     setText("#sessionUserName", profileName());
     const adminNav = $("#adminNavButton");
     if (adminNav) adminNav.hidden = app.profile?.role !== "admin";
+    const exportButton = $("#exportCharacterPdfButton");
+    if (exportButton) exportButton.hidden = !selectedCharacterId();
   }
 
   async function loadProfile() {
@@ -583,10 +621,13 @@
     app.saveTimer = window.setTimeout(saveCharacter, 900);
   }
 
-  async function saveCharacter() {
+  async function saveCharacter(options = {}) {
+    const { silent = false } = options;
     const sessionId = selectedSessionId();
     const characterId = selectedCharacterId();
-    if (!app.user || !sessionId || !characterId || app.currentRole === "master" || app.readOnlyCharacter) return;
+    if (!app.user || !sessionId || !characterId || app.currentRole === "master" || app.readOnlyCharacter) {
+      return { ok: false, skipped: true, message: "Salvataggio non disponibile per questa scheda" };
+    }
     const state = { ...getState(), activeSessionId: sessionId, appVersion: APP_VERSION };
     const { error } = await app.client
       .from("characters")
@@ -595,17 +636,27 @@
         data: state,
       })
       .eq("id", characterId);
-    setStatus(error ? "Errore salvataggio" : "Salvato");
-    await syncCustomSpells(state);
+    if (error) {
+      if (!silent) setStatus("Errore salvataggio");
+      return { ok: false, message: "Scheda non sincronizzata" };
+    }
+    const spellSync = await syncCustomSpells(state);
+    if (!spellSync.ok) {
+      if (!silent) setStatus("Scheda salvata, incantesimi custom non sincronizzati");
+      return { ok: false, message: "Scheda salvata, incantesimi custom non sincronizzati" };
+    }
+    if (!silent) setStatus("Salvato");
+    return { ok: true, message: "Sincronizzato con Supabase" };
   }
 
   async function syncCustomSpells(state = getState()) {
     const sessionId = selectedSessionId();
-    if (!sessionId || !app.user) return;
+    if (!sessionId || !app.user) return { ok: false, message: "Sessione non disponibile" };
     const customSpells = Array.isArray(state.customSpells) ? state.customSpells : [];
-    await app.client.from("custom_spells").delete().eq("session_id", sessionId).eq("owner_id", app.user.id);
-    if (!customSpells.length) return;
-    await app.client.from("custom_spells").insert(
+    const { error: deleteError } = await app.client.from("custom_spells").delete().eq("session_id", sessionId).eq("owner_id", app.user.id);
+    if (deleteError) return { ok: false, message: "Custom spell non cancellati" };
+    if (!customSpells.length) return { ok: true, message: "Nessun incantesimo custom" };
+    const { error: insertError } = await app.client.from("custom_spells").insert(
       customSpells.map((spell) => ({
         session_id: sessionId,
         owner_id: app.user.id,
@@ -616,6 +667,326 @@
         data: spell,
       }))
     );
+    return insertError ? { ok: false, message: "Custom spell non sincronizzati" } : { ok: true, message: "Custom spell sincronizzati" };
+  }
+
+  async function exportCurrentCharacterPdf() {
+    const button = $("#exportCharacterPdfButton");
+    if (button) button.disabled = true;
+    setStatus("Preparo PDF...");
+    try {
+      const syncResult = await ensureCharacterSyncedForExport();
+      const state = { ...getState(), activeSessionId: selectedSessionId(), appVersion: APP_VERSION };
+      const characterName = state.name || "Personaggio senza nome";
+      const pdf = buildCharacterBackupPdf(
+        [
+          {
+            state,
+            title: characterName,
+            syncStatus: syncResult.message,
+          },
+        ],
+        {
+          title: `Backup scheda - ${characterName}`,
+          generatedAt: new Date(),
+        }
+      );
+      downloadBlob(pdf, `${safeFileName(characterName)}-scheda.pdf`);
+      setStatus(syncResult.ok ? "PDF creato e scheda sincronizzata" : "PDF creato, sincronizzazione non completata");
+      closeDrawer();
+    } catch {
+      setStatus("PDF non creato");
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function ensureCharacterSyncedForExport() {
+    window.clearTimeout(app.saveTimer);
+    if (!app.client || !app.user) return { ok: false, message: "Non sincronizzato: Supabase non disponibile" };
+    if (!selectedCharacterId()) return { ok: false, message: "Non sincronizzato: scheda non selezionata" };
+    if (app.readOnlyCharacter || app.currentRole === "master") return { ok: true, message: "Sola lettura: esportazione senza salvataggio" };
+    setStatus("Verifico salvataggio...");
+    return saveCharacter({ silent: true });
+  }
+
+  function buildCharacterBackupPdf(characterBackups, options = {}) {
+    const lines = [];
+    addPdfLine(lines, options.title || "Backup scheda personaggio", 18, 8);
+    addPdfLine(lines, `Creato il ${formatDateTime(options.generatedAt || new Date())}`, 10, 16);
+    characterBackups.forEach((backup, index) => {
+      if (index > 0) addPdfLine(lines, "", 10, 12);
+      appendCharacterBackupLines(lines, backup.state || {}, backup);
+    });
+    return new Blob([createPdfBytes(lines)], { type: "application/pdf" });
+  }
+
+  function appendCharacterBackupLines(lines, state, backup = {}) {
+    addPdfLine(lines, backup.title || state.name || "Personaggio senza nome", 15, 8);
+    addPdfKeyValues(lines, [
+      ["Sincronizzazione DB", backup.syncStatus || "Non verificata"],
+      ["Sessione", state.session],
+      ["Giocatore", state.playerName],
+      ["Versione app", state.appVersion],
+    ]);
+
+    addPdfSection(lines, "Dati principali");
+    addPdfKeyValues(lines, [
+      ["Nome", state.name],
+      ["Razza", state.race],
+      ["Classe e livello", state.classLevel],
+      ["Background", state.background],
+      ["Allineamento", state.alignment],
+      ["PX", state.experience],
+      ["Eta", state.age],
+      ["Altezza", state.height],
+      ["Peso", state.weight],
+      ["Occhi", state.eyes],
+      ["Pelle", state.skin],
+      ["Capelli", state.hair],
+    ]);
+
+    addPdfSection(lines, "Combattimento");
+    addPdfKeyValues(lines, [
+      ["PF", `${valueOrDash(state.hpCurrent)} / ${valueOrDash(state.hpMax)} + temp ${valueOrDash(state.hpTemp)}`],
+      ["CA", state.armorClass],
+      ["Iniziativa", state.initiative],
+      ["Velocita", state.speed],
+      ["Dadi vita", state.hitDice],
+      ["Competenza", state.proficiency],
+      ["Ispirazione", state.inspiration ? "Si" : "No"],
+      ["Percezione passiva", state.passivePerception],
+      ["TS morte", `Successi ${Number(state.deathSuccesses) || 0}, fallimenti ${Number(state.deathFailures) || 0}`],
+    ]);
+
+    addPdfSection(lines, "Caratteristiche");
+    addPdfWrapped(
+      lines,
+      PDF_ABILITIES
+        .map(([key, label]) => `${label}: ${valueOrDash(state.abilities?.[key])} (${signedPdf(abilityModPdf(state.abilities?.[key]))})`)
+        .join(" | ")
+    );
+
+    addPdfSection(lines, "Competenze");
+    addPdfKeyValues(lines, [
+      ["Tiri salvezza", checkedLabels(PDF_SAVES, state.saveProficiencies).join(", ") || "-"],
+      ["Abilita", checkedLabels(PDF_SKILLS, state.skillProficiencies).join(", ") || "-"],
+      ["Altre competenze e linguaggi", state.proficienciesLanguages],
+      ["Privilegi e tratti", state.featuresTraits],
+    ]);
+
+    addPdfSection(lines, "Attacchi");
+    const attacks = Array.isArray(state.attacks) ? state.attacks : [];
+    if (attacks.length) {
+      attacks.forEach((attack, index) => addPdfWrapped(lines, `${index + 1}. ${valueOrDash(attack.name)} | Bonus ${valueOrDash(attack.bonus)} | Danni ${valueOrDash(attack.damage)}`));
+    } else {
+      addPdfWrapped(lines, "-");
+    }
+
+    addPdfSection(lines, "Magia");
+    addPdfKeyValues(lines, [
+      ["CD incantesimi", state.spellDc],
+      ["Bonus attacco inc.", state.spellAttack],
+      ["Slot", formatSpellSlots(state.slots)],
+      ["Trucchetti testuali", state.cantrips],
+      ["Incantesimi testuali", state.spells],
+    ]);
+    appendKnownSpells(lines, state);
+
+    addPdfSection(lines, "Equipaggiamento e tesoro");
+    addPdfKeyValues(lines, [
+      ["Monete", `MR ${Number(state.coinMr) || 0}, MA ${Number(state.coinMa) || 0}, ME ${Number(state.coinMe) || 0}, MO ${Number(state.coinMo) || 0}, MP ${Number(state.coinMp) || 0}`],
+      ["Equipaggiamento", state.equipment],
+      ["Tesoro", state.treasure],
+    ]);
+    const equipmentItems = Array.isArray(state.equipmentItems) ? state.equipmentItems : [];
+    equipmentItems.forEach((item, index) => addPdfWrapped(lines, `${index + 1}. ${valueOrDash(item.name)} - ${valueOrDash(item.description)}`));
+
+    addPdfSection(lines, "Storia e note");
+    addPdfKeyValues(lines, [
+      ["Tratti caratteriali", state.personality],
+      ["Ideali", state.ideals],
+      ["Legami", state.bonds],
+      ["Difetti", state.flaws],
+      ["Storia", state.backstory],
+      ["Alleati e organizzazioni", state.allies],
+      ["Simbolo", state.symbol],
+    ]);
+  }
+
+  function appendKnownSpells(lines, state) {
+    const customSpells = Array.isArray(state.customSpells) ? state.customSpells : [];
+    const spells = [...(Array.isArray(window.DND_SPELLS) ? window.DND_SPELLS : []), ...customSpells];
+    const spellById = new Map(spells.map((spell) => [spell.id, spell]));
+    const knownIds = Array.isArray(state.knownSpellIds) ? state.knownSpellIds : [];
+    const preparedIds = new Set(Array.isArray(state.preparedSpellIds) ? state.preparedSpellIds : []);
+    if (!knownIds.length) {
+      addPdfWrapped(lines, "Incantesimi del personaggio: -");
+    } else {
+      addPdfLine(lines, "Incantesimi del personaggio", 11, 4);
+      knownIds.forEach((id, index) => {
+        const spell = spellById.get(id);
+        if (!spell) {
+          addPdfWrapped(lines, `${index + 1}. ${id}`);
+          return;
+        }
+        const prepared = preparedIds.has(id) ? "Preparato" : "Non preparato";
+        addPdfWrapped(
+          lines,
+          `${index + 1}. ${spell.name_it || spell.name} - ${spell.level_it || spell.level || "-"} - ${spell.source || "-"} - ${prepared}`
+        );
+        addPdfWrapped(
+          lines,
+          `Scuola: ${valueOrDash(spell.school_it)} | Tempo: ${valueOrDash(spell.casting_time)} | Raggio: ${valueOrDash(spell.range)} | Componenti: ${valueOrDash(spell.components)} | Durata: ${valueOrDash(spell.duration)}`,
+          14
+        );
+        if (spell.description) addPdfWrapped(lines, spell.description, 14);
+      });
+    }
+    if (customSpells.length) {
+      addPdfLine(lines, "Incantesimi custom locali", 11, 4);
+      customSpells.forEach((spell, index) => addPdfWrapped(lines, `${index + 1}. ${spell.name_it || spell.name} - ${spell.level_it || spell.level} - ${spell.source || "Custom"}`));
+    }
+  }
+
+  function addPdfSection(lines, title) {
+    addPdfLine(lines, "", 10, 4);
+    addPdfLine(lines, title, 13, 6);
+  }
+
+  function addPdfKeyValues(lines, entries) {
+    entries.forEach(([label, value]) => addPdfWrapped(lines, `${label}: ${valueOrDash(value)}`));
+  }
+
+  function addPdfWrapped(lines, text, indent = 0) {
+    const safe = String(valueOrDash(text)).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    safe.split("\n").forEach((paragraph) => {
+      const words = paragraph.split(/\s+/).filter(Boolean);
+      if (!words.length) {
+        addPdfLine(lines, "", 10, 6, indent);
+        return;
+      }
+      let current = "";
+      words.forEach((word) => {
+        const next = current ? `${current} ${word}` : word;
+        if (pdfApproxLength(next, indent) > 94 && current) {
+          addPdfLine(lines, current, 10, 2, indent);
+          current = word;
+        } else {
+          current = next;
+        }
+      });
+      if (current) addPdfLine(lines, current, 10, 2, indent);
+    });
+  }
+
+  function addPdfLine(lines, text, size = 10, after = 2, indent = 0) {
+    lines.push({ text: String(text ?? ""), size, after, indent });
+  }
+
+  function createPdfBytes(lines) {
+    const pageWidth = 595.28;
+    const pageHeight = 841.89;
+    const margin = 42;
+    const pages = [];
+    let page = [];
+    let y = pageHeight - margin;
+    lines.forEach((line) => {
+      const needed = line.size + line.after + 4;
+      if (y - needed < margin && page.length) {
+        pages.push(page);
+        page = [];
+        y = pageHeight - margin;
+      }
+      page.push({ ...line, x: margin + (line.indent || 0), y });
+      y -= needed;
+    });
+    if (page.length) pages.push(page);
+
+    const objects = [];
+    const pageRefs = pages.map((_, index) => 4 + index * 2);
+    objects[0] = "<< /Type /Catalog /Pages 2 0 R >>";
+    objects[1] = `<< /Type /Pages /Kids [${pageRefs.map((ref) => `${ref} 0 R`).join(" ")}] /Count ${pages.length} >>`;
+    objects[2] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
+    pages.forEach((pdfPage, index) => {
+      const pageObjectNumber = 4 + index * 2;
+      const contentObjectNumber = pageObjectNumber + 1;
+      const content = pdfPage
+        .map((line) => `BT /F1 ${line.size} Tf ${line.x.toFixed(2)} ${line.y.toFixed(2)} Td (${escapePdfString(line.text)}) Tj ET`)
+        .join("\n");
+      objects[pageObjectNumber - 1] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`;
+      objects[contentObjectNumber - 1] = `<< /Length ${content.length} >>\nstream\n${content}\nendstream`;
+    });
+
+    let pdf = "%PDF-1.4\n";
+    const offsets = [0];
+    objects.forEach((object, index) => {
+      offsets[index + 1] = pdf.length;
+      pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+    });
+    const xrefOffset = pdf.length;
+    pdf += `xref\n0 ${objects.length + 1}\n`;
+    pdf += "0000000000 65535 f \n";
+    offsets.slice(1).forEach((offset) => {
+      pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+    });
+    pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+    return pdf;
+  }
+
+  function escapePdfString(value) {
+    return pdfSafeText(value).replaceAll("\\", "\\\\").replaceAll("(", "\\(").replaceAll(")", "\\)");
+  }
+
+  function pdfSafeText(value) {
+    return String(value ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^\x20-\x7E]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function pdfApproxLength(text, indent = 0) {
+    return String(text).length + Math.round(indent / 5);
+  }
+
+  function checkedLabels(definitions, values = {}) {
+    return definitions.filter(([key]) => Boolean(values?.[key])).map(([, label]) => label);
+  }
+
+  function formatSpellSlots(slots) {
+    if (!Array.isArray(slots) || !slots.length) return "-";
+    return slots.map((slot) => `L${slot.level}: ${Number(slot.current) || 0}/${Number(slot.max) || 0}`).join(", ");
+  }
+
+  function abilityModPdf(score) {
+    return Math.floor(((Number(score) || 10) - 10) / 2);
+  }
+
+  function signedPdf(value) {
+    const number = Number(value) || 0;
+    return number >= 0 ? `+${number}` : `${number}`;
+  }
+
+  function valueOrDash(value) {
+    if (value === null || value === undefined || value === "") return "-";
+    return value;
+  }
+
+  function safeFileName(value) {
+    return pdfSafeText(value || "personaggio").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "personaggio";
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   async function openMasterDashboard(session) {
@@ -1034,6 +1405,7 @@
     $("#drawerBackdrop").addEventListener("click", closeDrawer);
     $("#logoutButton").addEventListener("click", signOut);
     $("#changeOwnPasswordButton").addEventListener("click", changeOwnPassword);
+    $("#exportCharacterPdfButton").addEventListener("click", exportCurrentCharacterPdf);
     $("#inviteUserSearch").addEventListener("input", debounce(searchInviteUsers, 350));
     $$("[data-theme-mode][data-theme-token]").forEach((input) => {
       input.addEventListener("input", () => applyThemePalette(paletteFromControls()));
@@ -1046,6 +1418,7 @@
     });
     $("#characterView").addEventListener("input", queueCharacterSave, true);
     $("#characterView").addEventListener("change", queueCharacterSave, true);
+    $("#characterView").addEventListener("click", queueCharacterSave);
   }
 
   function debounce(callback, delay) {
@@ -1070,6 +1443,11 @@
   function formatTime(value) {
     if (!value) return "-";
     return new Date(value).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function formatDateTime(value) {
+    if (!value) return "-";
+    return new Date(value).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" });
   }
 
   async function init() {
