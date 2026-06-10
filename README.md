@@ -2,7 +2,7 @@
 
 Primo prototipo mobile della schermata personaggio.
 
-Versione app: `1.5.0`
+Versione app: `1.6.0`
 
 Apri `index.html` nel browser per provarlo. I dati vengono salvati automaticamente nel browser del dispositivo.
 
@@ -24,3 +24,4 @@ Per pubblicare l'app su Cloudflare Pages e collegarla a Supabase, leggi `INFRAST
 - Pagina login iniziale, pagina sessioni, inviti e pagine separate per impostazioni e amministrazione.
 - Vista master senza personaggio, con stato live dei personaggi della sessione.
 - Palette tema personale salvata su Supabase, separata per tema chiaro e scuro.
+- Account applicativi username/password creati dall'amministrazione, senza usare email reali.

@@ -1,9 +1,10 @@
 (() => {
   const STORAGE_KEY = "dnd-mobile-character-v1";
+  const APP_TOKEN_KEY = "dnd-app-account-token-v1";
   const SESSION_ID_KEY = "dnd-mobile-session-id-v1";
   const CHARACTER_ID_KEY = "dnd-mobile-character-id-v1";
   const MASTER_PREVIEW_KEY = "dnd-master-character-preview-v1";
-  const APP_VERSION = "1.5.0";
+  const APP_VERSION = "1.6.0";
   const DEFAULT_THEME_PALETTE = {
     dark: { background: "#17130f", surface: "#231d17", accent: "#d8ae5f", muted: "#b9aa99" },
     light: { background: "#f0ece4", surface: "#fff8ee", accent: "#7f5217", muted: "#766755" },
@@ -67,9 +68,11 @@
     currentRole: "",
     masterCharacters: [],
     masterChannel: null,
+    masterPollTimer: null,
     saveTimer: null,
     config: window.DND_APP_CONFIG || {},
     readOnlyCharacter: false,
+    sessionToken: localStorage.getItem(APP_TOKEN_KEY) || "",
   };
 
   const $ = (selector) => document.querySelector(selector);
@@ -114,7 +117,7 @@
   }
 
   function profileName(profile = app.profile) {
-    return profile?.display_name || profile?.username || app.user?.email || "Utente";
+    return profile?.display_name || profile?.username || "Utente";
   }
 
   function normalizeThemeColor(value, fallback = "#000000") {
@@ -239,12 +242,13 @@
     const palette = normalizeThemePalette(value);
     applyThemePalette(palette);
     if (!app.user || !app.client) return;
-    const { error } = await app.client.from("profiles").update({ theme_palette: palette }).eq("id", app.user.id);
+    const { data, error } = await app.client.rpc("app_update_theme_palette", { app_token: app.sessionToken, palette });
     if (error) {
       setStatus("Tema non salvato");
       return;
     }
-    app.profile = { ...(app.profile || {}), theme_palette: palette };
+    app.profile = data || { ...(app.profile || {}), theme_palette: palette };
+    app.user = app.profile;
     setStatus("Tema salvato");
   }
 
@@ -408,8 +412,8 @@
 
   function renderDrawer() {
     setText("#drawerUserName", profileName());
-    setText("#drawerUserEmail", app.user?.email || "");
-    setText("#settingsUserEmail", app.user?.email || "");
+    setText("#drawerUserEmail", app.profile?.username ? `@${app.profile.username}` : "");
+    setText("#settingsUserEmail", app.profile?.username ? `@${app.profile.username}` : "");
     setText("#sessionUserName", profileName());
     const adminNav = $("#adminNavButton");
     if (adminNav) adminNav.hidden = app.profile?.role !== "admin";
@@ -418,56 +422,42 @@
   }
 
   async function loadProfile() {
-    let { data, error } = await app.client
-      .from("profiles")
-      .select("id, username, display_name, role, theme_palette")
-      .eq("id", app.user.id)
-      .single();
-
-    if (error) {
-      const fallback = await app.client
-        .from("profiles")
-        .select("id, username, display_name, role")
-        .eq("id", app.user.id)
-        .single();
-      data = fallback.data;
-      error = fallback.error;
+    const { data, error } = await app.client.rpc("app_get_shell", { app_token: app.sessionToken });
+    if (error || !data?.profile) {
+      app.user = null;
+      app.profile = null;
+      app.sessions = [];
+      app.invites = [];
+      localStorage.removeItem(APP_TOKEN_KEY);
+      app.sessionToken = "";
+      throw error || new Error("Sessione non valida");
     }
-
-    app.profile = error ? { id: app.user.id, username: app.user.email, display_name: app.user.email, role: "user" } : data;
+    app.profile = data.profile;
+    app.user = data.profile;
+    app.sessions = data.sessions || [];
+    app.invites = data.invites || [];
     applyThemePalette(app.profile?.theme_palette || DEFAULT_THEME_PALETTE);
   }
 
   async function loadSessionsAndInvites() {
-    const { data: memberships } = await app.client
-      .from("session_members")
-      .select("role, sessions(id, name, owner_id, created_at)")
-      .eq("user_id", app.user.id)
-      .order("created_at", { ascending: false });
-    app.sessions = (memberships || []).filter((member) => member.sessions).map((member) => ({
-      role: member.role,
-      session: member.sessions,
-    }));
-
-    const { data: invites } = await app.client
-      .from("session_invites")
-      .select("id, status, created_at, session_id, sessions(id, name)")
-      .eq("invitee_id", app.user.id)
-      .eq("status", "pending")
-      .order("created_at", { ascending: false });
-    app.invites = invites || [];
+    const { data, error } = await app.client.rpc("app_get_shell", { app_token: app.sessionToken });
+    if (error || !data?.profile) throw error || new Error("Sessione non valida");
+    app.profile = data.profile;
+    app.user = data.profile;
+    app.sessions = data.sessions || [];
+    app.invites = data.invites || [];
   }
 
   async function refreshShellData() {
     await loadProfile();
-    await loadSessionsAndInvites();
     renderSessionList();
     renderInvites($("#inviteList"));
     renderDrawer();
   }
 
   async function routeAfterAuth() {
-    if (!app.user) {
+    if (!app.sessionToken) {
+      app.user = null;
       localStorage.removeItem(SESSION_ID_KEY);
       localStorage.removeItem(CHARACTER_ID_KEY);
       closeDrawer();
@@ -475,7 +465,18 @@
       return;
     }
 
-    await refreshShellData();
+    try {
+      await refreshShellData();
+    } catch {
+      localStorage.removeItem(APP_TOKEN_KEY);
+      app.sessionToken = "";
+      app.user = null;
+      app.profile = null;
+      closeDrawer();
+      showView("auth");
+      setText("#loginStatus", "Sessione scaduta. Accedi di nuovo.");
+      return;
+    }
 
     const sessionId = selectedSessionId();
     if (!sessionId) {
@@ -545,18 +546,14 @@
 
   async function loadSessionForAdmin(sessionId) {
     if (app.profile?.role !== "admin") return null;
-    const { data } = await app.client.from("sessions").select("id, name, owner_id, created_at").eq("id", sessionId).single();
+    const { data } = await app.client.rpc("app_get_session_for_admin", { app_token: app.sessionToken, target_session_id: sessionId });
     return data || null;
   }
 
   async function createSessionFromList() {
     const input = $("#newSessionName");
     const name = input.value.trim() || "Nuova sessione";
-    const { data, error } = await app.client
-      .from("sessions")
-      .insert({ name, owner_id: app.user.id })
-      .select("id, name, owner_id, created_at")
-      .single();
+    const { data, error } = await app.client.rpc("app_create_session", { app_token: app.sessionToken, session_name: name });
     if (error) {
       setStatus("Sessione non creata");
       return;
@@ -576,21 +573,12 @@
     const currentCharacterId = selectedCharacterId();
     if (localState.activeSessionId === session.id && currentCharacterId) return;
 
-    let query = app.client
-      .from("characters")
-      .select("id, name, data, updated_at")
-      .eq("session_id", session.id)
-      .eq("owner_id", app.user.id)
-      .order("updated_at", { ascending: false })
-      .limit(1);
-
-    if (currentCharacterId) {
-      query = app.client.from("characters").select("id, name, data, updated_at").eq("id", currentCharacterId).limit(1);
-    }
-
-    const { data, error } = await query;
-    if (!error && Array.isArray(data) && data.length) {
-      const character = data[0];
+    const { data: character, error } = await app.client.rpc("app_load_character", {
+      app_token: app.sessionToken,
+      target_session_id: session.id,
+      target_character_id: currentCharacterId || null,
+    });
+    if (!error && character?.id) {
       localStorage.setItem(CHARACTER_ID_KEY, character.id);
       setState({ ...character.data, activeSessionId: session.id, session: session.name, appVersion: APP_VERSION });
       window.location.reload();
@@ -598,16 +586,11 @@
     }
 
     const blank = blankCharacterData(session);
-    const { data: created, error: createError } = await app.client
-      .from("characters")
-      .insert({
-        session_id: session.id,
-        owner_id: app.user.id,
-        name: "Personaggio senza nome",
-        data: blank,
-      })
-      .select("id")
-      .single();
+    const { data: created, error: createError } = await app.client.rpc("app_create_character", {
+      app_token: app.sessionToken,
+      target_session_id: session.id,
+      character_data: blank,
+    });
     if (!createError && created) {
       localStorage.setItem(CHARACTER_ID_KEY, created.id);
     }
@@ -629,13 +612,11 @@
       return { ok: false, skipped: true, message: "Salvataggio non disponibile per questa scheda" };
     }
     const state = { ...getState(), activeSessionId: sessionId, appVersion: APP_VERSION };
-    const { error } = await app.client
-      .from("characters")
-      .update({
-        name: state.name || "Personaggio senza nome",
-        data: state,
-      })
-      .eq("id", characterId);
+    const { error } = await app.client.rpc("app_update_character", {
+      app_token: app.sessionToken,
+      target_character_id: characterId,
+      character_data: state,
+    });
     if (error) {
       if (!silent) setStatus("Errore salvataggio");
       return { ok: false, message: "Scheda non sincronizzata" };
@@ -653,21 +634,12 @@
     const sessionId = selectedSessionId();
     if (!sessionId || !app.user) return { ok: false, message: "Sessione non disponibile" };
     const customSpells = Array.isArray(state.customSpells) ? state.customSpells : [];
-    const { error: deleteError } = await app.client.from("custom_spells").delete().eq("session_id", sessionId).eq("owner_id", app.user.id);
-    if (deleteError) return { ok: false, message: "Custom spell non cancellati" };
-    if (!customSpells.length) return { ok: true, message: "Nessun incantesimo custom" };
-    const { error: insertError } = await app.client.from("custom_spells").insert(
-      customSpells.map((spell) => ({
-        session_id: sessionId,
-        owner_id: app.user.id,
-        name: spell.name_it || spell.name,
-        class_names: spell.classes || [],
-        level: Number(spell.level) || 0,
-        source: spell.source || "Custom",
-        data: spell,
-      }))
-    );
-    return insertError ? { ok: false, message: "Custom spell non sincronizzati" } : { ok: true, message: "Custom spell sincronizzati" };
+    const { error } = await app.client.rpc("app_sync_custom_spells", {
+      app_token: app.sessionToken,
+      target_session_id: sessionId,
+      custom_spells: customSpells,
+    });
+    return error ? { ok: false, message: "Custom spell non sincronizzati" } : { ok: true, message: "Custom spell sincronizzati" };
   }
 
   async function exportCurrentCharacterPdf() {
@@ -997,28 +969,17 @@
   }
 
   async function loadMasterCharacters(sessionId) {
-    const { data, error } = await app.client
-      .from("characters")
-      .select("id, name, owner_id, data, updated_at")
-      .eq("session_id", sessionId)
-      .order("updated_at", { ascending: false });
+    const { data, error } = await app.client.rpc("app_list_master_characters", {
+      app_token: app.sessionToken,
+      target_session_id: sessionId,
+    });
     if (error) {
       app.masterCharacters = [];
       renderMasterCharacters();
       return;
     }
 
-    const ownerIds = [...new Set((data || []).map((character) => character.owner_id).filter(Boolean))];
-    let profileMap = {};
-    if (ownerIds.length) {
-      const { data: profiles } = await app.client.from("profiles").select("id, username, display_name").in("id", ownerIds);
-      profileMap = Object.fromEntries((profiles || []).map((profile) => [profile.id, profile]));
-    }
-
-    app.masterCharacters = (data || []).map((character) => ({
-      ...character,
-      ownerProfile: profileMap[character.owner_id] || null,
-    }));
+    app.masterCharacters = data || [];
     renderMasterCharacters();
   }
 
@@ -1140,16 +1101,18 @@
   }
 
   function subscribeMasterCharacters(sessionId) {
-    if (!app.client?.channel) return;
     stopMasterRealtime();
-    app.masterChannel = app.client
-      .channel(`session-characters-${sessionId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "characters", filter: `session_id=eq.${sessionId}` },
-        () => loadMasterCharacters(sessionId)
-      )
-      .subscribe();
+    if (app.client?.channel) {
+      app.masterChannel = app.client
+        .channel(`session-characters-${sessionId}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "characters", filter: `session_id=eq.${sessionId}` },
+          () => loadMasterCharacters(sessionId)
+        )
+        .subscribe();
+    }
+    app.masterPollTimer = window.setInterval(() => loadMasterCharacters(sessionId), 7000);
   }
 
   function stopMasterRealtime() {
@@ -1157,10 +1120,12 @@
       app.client.removeChannel(app.masterChannel);
     }
     app.masterChannel = null;
+    window.clearInterval(app.masterPollTimer);
+    app.masterPollTimer = null;
   }
 
   async function acceptInvite(inviteId) {
-    const { data, error } = await app.client.rpc("accept_session_invite", { target_invite_id: inviteId });
+    const { data, error } = await app.client.rpc("app_accept_invite", { app_token: app.sessionToken, target_invite_id: inviteId });
     if (error) {
       setStatus("Invito non accettato");
       return;
@@ -1169,7 +1134,7 @@
   }
 
   async function declineInvite(inviteId) {
-    await app.client.rpc("decline_session_invite", { target_invite_id: inviteId });
+    await app.client.rpc("app_decline_invite", { app_token: app.sessionToken, target_invite_id: inviteId });
     await loadSessionsAndInvites();
     renderInvites($("#inviteList"));
   }
@@ -1181,7 +1146,7 @@
       setStatus("Password troppo corta");
       return;
     }
-    const { error } = await app.client.auth.updateUser({ password });
+    const { error } = await app.client.rpc("app_change_password", { app_token: app.sessionToken, new_password: password });
     input.value = "";
     setStatus(error ? "Password non cambiata" : "Password cambiata");
   }
@@ -1193,11 +1158,7 @@
       results.innerHTML = `<div class="empty-state">Scrivi almeno 2 caratteri.</div>`;
       return;
     }
-    const { data, error } = await app.client
-      .from("profiles")
-      .select("id, username, display_name")
-      .ilike("username", `%${term}%`)
-      .limit(8);
+    const { data, error } = await app.client.rpc("app_search_accounts", { app_token: app.sessionToken, search_term: term });
     if (error || !data.length) {
       results.innerHTML = `<div class="empty-state">Nessun utente trovato.</div>`;
       return;
@@ -1221,10 +1182,10 @@
 
   async function inviteUser(userId) {
     if (!app.currentSession) return;
-    const { error } = await app.client.from("session_invites").insert({
-      session_id: app.currentSession.id,
-      inviter_id: app.user.id,
-      invitee_id: userId,
+    const { error } = await app.client.rpc("app_invite_account", {
+      app_token: app.sessionToken,
+      target_session_id: app.currentSession.id,
+      target_account_id: userId,
     });
     setStatus(error ? "Invito non inviato" : "Invito inviato");
   }
@@ -1235,10 +1196,7 @@
 
   async function loadAdminUsers() {
     const list = $("#adminUsersList");
-    const { data, error } = await app.client
-      .from("profiles")
-      .select("id, username, display_name, role, created_at")
-      .order("username", { ascending: true });
+    const { data, error } = await app.client.rpc("app_admin_list_accounts", { app_token: app.sessionToken });
     if (error || !data) {
       list.innerHTML = `<div class="empty-state">Account non caricati.</div>`;
       return;
@@ -1265,7 +1223,7 @@
 
   async function loadAdminSessions() {
     const list = $("#adminSessionsList");
-    const { data, error } = await app.client.from("sessions").select("id, name, owner_id, created_at").order("created_at", { ascending: false });
+    const { data, error } = await app.client.rpc("app_admin_list_sessions", { app_token: app.sessionToken });
     if (error || !data) {
       list.innerHTML = `<div class="empty-state">Sessioni non caricate.</div>`;
       return;
@@ -1293,45 +1251,27 @@
   }
 
   async function createAdminUser() {
-    const email = $("#adminNewUserEmail").value.trim();
     const username = $("#adminNewUsername").value.trim();
     const displayName = $("#adminNewDisplayName").value.trim() || username;
     const password = $("#adminNewPassword").value;
-    if (!email || !username || password.length < 6) {
+    if (!username || password.length < 6) {
       setStatus("Dati account incompleti");
       return;
     }
 
-    const memoryStorage = {
-      getItem: () => null,
-      setItem: () => {},
-      removeItem: () => {},
-    };
-    const signupClient = window.supabase.createClient(app.config.supabaseUrl, app.config.supabaseAnonKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-        storage: memoryStorage,
-      },
+    const { error } = await app.client.rpc("app_admin_create_account", {
+      app_token: app.sessionToken,
+      target_username: username,
+      target_display_name: displayName,
+      target_password: password,
+      target_role: "user",
     });
-
-    const { data, error } = await signupClient.auth.signUp({
-      email,
-      password,
-      options: { data: { username, display_name: displayName } },
-    });
-    if (error || !data.user) {
+    if (error) {
       setStatus("Account non creato");
       return;
     }
 
-    await app.client
-      .from("profiles")
-      .update({ username, display_name: displayName, role: "user" })
-      .eq("id", data.user.id);
-
-    ["adminNewUserEmail", "adminNewUsername", "adminNewDisplayName", "adminNewPassword"].forEach((id) => {
+    ["adminNewUsername", "adminNewDisplayName", "adminNewPassword"].forEach((id) => {
       const element = document.getElementById(id);
       if (element) element.value = "";
     });
@@ -1340,7 +1280,11 @@
   }
 
   async function updateUserRole(userId, role) {
-    const { error } = await app.client.from("profiles").update({ role }).eq("id", userId);
+    const { error } = await app.client.rpc("app_admin_update_account_role", {
+      app_token: app.sessionToken,
+      target_account_id: userId,
+      target_role: role,
+    });
     setStatus(error ? "Ruolo non cambiato" : "Ruolo aggiornato");
     await loadAdminUsers();
     await loadProfile();
@@ -1348,7 +1292,7 @@
   }
 
   async function deleteAdminSession(sessionId) {
-    const { error } = await app.client.from("sessions").delete().eq("id", sessionId);
+    const { error } = await app.client.rpc("app_admin_delete_session", { app_token: app.sessionToken, target_session_id: sessionId });
     setStatus(error ? "Sessione non eliminata" : "Sessione eliminata");
     await loadAdminSessions();
     await loadSessionsAndInvites();
@@ -1360,31 +1304,38 @@
       $("#loginStatus").textContent = "Configurazione Supabase mancante.";
       return;
     }
-    const email = $("#loginEmail").value.trim();
+    const username = $("#loginUsername").value.trim();
     const password = $("#loginPassword").value;
-    if (!email || !password) {
-      $("#loginStatus").textContent = "Inserisci email e password.";
+    if (!username || !password) {
+      $("#loginStatus").textContent = "Inserisci username e password.";
       return;
     }
     $("#loginStatus").textContent = "Accesso...";
-    const { data, error } = await app.client.auth.signInWithPassword({ email, password });
+    const { data, error } = await app.client.rpc("app_login_account", { target_username: username, target_password: password });
     if (error) {
       $("#loginStatus").textContent = "Accesso non riuscito.";
       return;
     }
-    app.user = data.user;
+    app.sessionToken = data.token;
+    localStorage.setItem(APP_TOKEN_KEY, app.sessionToken);
+    app.user = data.profile;
+    app.profile = data.profile;
     $("#loginPassword").value = "";
     await routeAfterAuth();
   }
 
   async function signOut() {
     stopMasterRealtime();
-    await app.client.auth.signOut();
+    if (app.sessionToken) {
+      await app.client.rpc("app_logout_account", { app_token: app.sessionToken });
+    }
     app.user = null;
     app.profile = null;
+    app.sessionToken = "";
     app.currentSession = null;
     app.currentRole = "";
     app.masterCharacters = [];
+    localStorage.removeItem(APP_TOKEN_KEY);
     localStorage.removeItem(SESSION_ID_KEY);
     localStorage.removeItem(CHARACTER_ID_KEY);
     localStorage.removeItem(MASTER_PREVIEW_KEY);
@@ -1460,12 +1411,6 @@
     }
 
     app.client = window.supabase.createClient(app.config.supabaseUrl, app.config.supabaseAnonKey);
-    const { data } = await app.client.auth.getSession();
-    app.user = data.session?.user || null;
-    app.client.auth.onAuthStateChange((_event, session) => {
-      app.user = session?.user || null;
-      routeAfterAuth();
-    });
     await routeAfterAuth();
   }
 

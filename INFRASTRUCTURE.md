@@ -1,6 +1,6 @@
 # Infrastruttura: Cloudflare Pages + Supabase
 
-Questa app puo essere ospitata su Cloudflare Pages come sito statico. Supabase gestira login, database, sessioni, personaggi e dati condivisi.
+Questa app puo essere ospitata su Cloudflare Pages come sito statico. Supabase gestira database, sessioni, personaggi e dati condivisi. Gli account dell'app sono account applicativi username/password e non richiedono email reali in Supabase Auth.
 
 ## 1. Supabase
 
@@ -11,8 +11,7 @@ Questa app puo essere ospitata su Cloudflare Pages come sito statico. Supabase g
 5. Per la versione 1.3, esegui anche tutto il contenuto di `supabase/version-1.3.sql`.
 6. Per la versione 1.4, esegui anche tutto il contenuto di `supabase/version-1.4.sql`.
 7. Per la versione 1.5, esegui anche tutto il contenuto di `supabase/version-1.5.sql`.
-8. In `Authentication > Providers`, abilita almeno Email.
-9. In `Authentication > URL Configuration`, aggiungi l'URL Cloudflare Pages quando sara disponibile.
+8. Per la versione 1.6, esegui anche tutto il contenuto di `supabase/version-1.6.sql`.
 
 Lo schema include:
 
@@ -23,6 +22,8 @@ Lo schema include:
 - `custom_spells`
 - `master_messages`
 - `session_invites`
+- `app_accounts`
+- `app_login_sessions`
 
 Tutte le tabelle principali hanno Row Level Security attiva.
 
@@ -30,11 +31,10 @@ Tutte le tabelle principali hanno Row Level Security attiva.
 
 Per creare l'admin iniziale:
 
-1. Crea un utente da Supabase Authentication con email e password di test.
-2. Esegui questa query nel SQL Editor, sostituendo l'email:
+1. Esegui questa query nel SQL Editor, scegliendo username e password:
 
 ```sql
-select public.bootstrap_admin('admin@example.com', 'Admin', 'Admin');
+select public.bootstrap_app_admin('admin', 'cambia-questa-password', 'Admin');
 ```
 
 Per sicurezza cambia subito la password dall'app dopo il primo accesso.
@@ -87,18 +87,9 @@ URL di test attuale:
 https://dnd-characters.united2-9999.workers.dev/
 ```
 
-## 3. Auth Supabase
+## 3. Account applicativi
 
-Per testare login e salvataggio:
-
-1. In `Authentication > Providers`, abilita Email.
-2. In `Authentication > URL Configuration`, imposta come Site URL:
-
-```text
-https://dnd-characters.united2-9999.workers.dev/
-```
-
-3. Aggiungi lo stesso URL anche tra i Redirect URLs consentiti.
+Il login usa `username` e `password` salvati in `app_accounts`. Le password sono salvate come hash tramite `pgcrypto`; il frontend conserva solo un token locale temporaneo creato da `app_login_sessions`.
 
 ## 4. Sviluppo locale
 
@@ -156,3 +147,12 @@ La versione 1.5 aggiunge:
 
 - colore personalizzabile per testi secondari e label in maiuscolo;
 - migrazione delle palette esistenti da 3 a 4 colori per tema.
+
+## 9. Versione 1.6
+
+La versione 1.6 aggiunge:
+
+- account applicativi username/password creati dal pannello amministrazione;
+- login senza email reali e senza dipendere da `auth.users`;
+- token applicativi per autorizzare sessioni, inviti, personaggi e pannello admin;
+- supporto ai ruoli per-sessione: lo stesso account puo essere master in una sessione e player in un'altra.
