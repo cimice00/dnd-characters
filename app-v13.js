@@ -703,6 +703,47 @@
     }
   }
 
+  async function exportMasterSessionPdf() {
+    const button = $("#exportSessionPdfButton");
+    if (button) button.disabled = true;
+    setStatus("Preparo PDF sessione...");
+    try {
+      if (!app.currentSession) {
+        setStatus("Sessione non selezionata");
+        return;
+      }
+      await loadMasterCharacters(app.currentSession.id);
+      if (!app.masterCharacters.length) {
+        setStatus("Nessuna scheda da esportare");
+        return;
+      }
+      const backups = app.masterCharacters.map((character) => {
+        const state = {
+          ...(character.data || {}),
+          activeSessionId: app.currentSession.id,
+          session: app.currentSession.name,
+          appVersion: APP_VERSION,
+        };
+        const owner = character.ownerProfile?.display_name || character.ownerProfile?.username || "Giocatore";
+        return {
+          state,
+          title: `${state.name || character.name || "Personaggio senza nome"} - ${owner}`,
+          syncStatus: "Dati riletti dal database al momento dell'esportazione",
+        };
+      });
+      const pdf = buildCharacterBackupPdf(backups, {
+        title: `Backup sessione - ${app.currentSession.name}`,
+        generatedAt: new Date(),
+      });
+      downloadBlob(pdf, `${safeFileName(app.currentSession.name)}-sessione.pdf`);
+      setStatus("PDF sessione creato");
+    } catch {
+      setStatus("PDF sessione non creato");
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
   async function ensureCharacterSyncedForExport() {
     window.clearTimeout(app.saveTimer);
     if (!app.client || !app.user) return { ok: false, message: "Non sincronizzato: Supabase non disponibile" };
@@ -1430,6 +1471,7 @@
     $("#logoutButton").addEventListener("click", signOut);
     $("#changeOwnPasswordButton").addEventListener("click", changeOwnPassword);
     $("#exportCharacterPdfButton").addEventListener("click", exportCurrentCharacterPdf);
+    $("#exportSessionPdfButton").addEventListener("click", exportMasterSessionPdf);
     $("#cancelDeleteSessionButton").addEventListener("click", closeDeleteSessionConfirm);
     $("#confirmDeleteSessionButton").addEventListener("click", confirmDeleteMasterSession);
     $("#deleteSessionConfirmBackdrop").addEventListener("click", (event) => {
