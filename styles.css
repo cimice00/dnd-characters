@@ -271,6 +271,7 @@ button {
 .section-title > span {
   min-width: 0;
   font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .section-actions {
@@ -279,6 +280,12 @@ button {
   gap: 8px;
   align-items: center;
   justify-content: flex-end;
+  min-width: 0;
+}
+
+#exportSessionPdfButton {
+  max-width: 100%;
+  white-space: normal;
 }
 
 .hp-row {
