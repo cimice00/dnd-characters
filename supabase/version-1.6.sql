@@ -890,6 +890,27 @@ begin
 end;
 $$;
 
+create or replace function public.app_delete_master_session(app_token text, target_session_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  account_id uuid := public.app_account_id_from_token(app_token);
+begin
+  if account_id is null then
+    raise exception 'Sessione non valida';
+  end if;
+  if not public.app_is_admin(account_id) and not public.app_is_session_master(target_session_id, account_id) then
+    raise exception 'Permesso negato';
+  end if;
+
+  delete from public.sessions
+  where id = target_session_id;
+end;
+$$;
+
 revoke all on function public.normalize_app_username(text) from public, anon, authenticated;
 revoke all on function public.app_token_hash(text) from public, anon, authenticated;
 revoke all on function public.app_account_id_from_token(text) from public, anon, authenticated;
@@ -921,3 +942,4 @@ grant execute on function public.app_admin_create_account(text, text, text, text
 grant execute on function public.app_admin_update_account_role(text, uuid, text) to anon, authenticated;
 grant execute on function public.app_admin_list_sessions(text) to anon, authenticated;
 grant execute on function public.app_admin_delete_session(text, uuid) to anon, authenticated;
+grant execute on function public.app_delete_master_session(text, uuid) to anon, authenticated;

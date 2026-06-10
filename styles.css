@@ -1167,6 +1167,61 @@ summary {
   text-align: left;
 }
 
+.danger-button {
+  border-color: rgba(164, 59, 54, 0.8);
+  background: var(--red);
+  color: #fff8ee;
+}
+
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: end center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.48);
+}
+
+.confirm-banner {
+  display: grid;
+  gap: 14px;
+  width: min(100%, 420px);
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-bg);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.36);
+}
+
+.confirm-banner span,
+.confirm-banner p {
+  color: var(--muted);
+}
+
+.confirm-banner span {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.confirm-banner strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+}
+
+.confirm-banner p {
+  margin: 6px 0 0;
+  line-height: 1.35;
+}
+
+.confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
 .theme-preset-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

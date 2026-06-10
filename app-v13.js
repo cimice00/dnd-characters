@@ -69,6 +69,7 @@
     masterCharacters: [],
     masterChannel: null,
     masterPollTimer: null,
+    pendingDeleteSessionId: "",
     saveTimer: null,
     config: window.DND_APP_CONFIG || {},
     readOnlyCharacter: false,
@@ -419,6 +420,34 @@
     if (adminNav) adminNav.hidden = app.profile?.role !== "admin";
     const exportButton = $("#exportCharacterPdfButton");
     if (exportButton) exportButton.hidden = !selectedCharacterId();
+    renderSettingsMasterSessions();
+  }
+
+  function renderSettingsMasterSessions() {
+    const panel = $("#masterSessionSettingsPanel");
+    const list = $("#masterSessionSettingsList");
+    if (!panel || !list) return;
+    const masterSessions = app.sessions.filter((item) => item.role === "master" && item.session);
+    panel.hidden = !masterSessions.length;
+    list.innerHTML = masterSessions.length
+      ? masterSessions
+          .map(
+            (item) => `
+              <article class="admin-row">
+                <strong>${escapeHtml(item.session.name)}</strong>
+                <small>Master</small>
+                <div class="row-actions">
+                  <button class="small-button danger-button" data-delete-master-session="${item.session.id}" type="button">Elimina</button>
+                </div>
+              </article>
+            `
+          )
+          .join("")
+      : `<div class="empty-state">Nessuna sessione master.</div>`;
+
+    list.querySelectorAll("[data-delete-master-session]").forEach((button) => {
+      button.addEventListener("click", () => requestDeleteMasterSession(button.dataset.deleteMasterSession));
+    });
   }
 
   async function loadProfile() {
@@ -526,6 +555,7 @@
     }
     if (target === "settings") {
       renderDrawer();
+      renderSettingsMasterSessions();
       showView("settings");
       return;
     }
@@ -1190,6 +1220,49 @@
     setStatus(error ? "Invito non inviato" : "Invito inviato");
   }
 
+  function requestDeleteMasterSession(sessionId) {
+    const membership = app.sessions.find((item) => item.session?.id === sessionId && item.role === "master");
+    if (!membership) return;
+    app.pendingDeleteSessionId = sessionId;
+    setText("#deleteSessionConfirmTitle", `Eliminare ${membership.session.name}?`);
+    setText("#deleteSessionConfirmText", "Questa azione rimuove la sessione e tutte le schede collegate. Non può essere annullata.");
+    $("#deleteSessionConfirmBackdrop").hidden = false;
+  }
+
+  function closeDeleteSessionConfirm() {
+    app.pendingDeleteSessionId = "";
+    $("#deleteSessionConfirmBackdrop").hidden = true;
+  }
+
+  async function confirmDeleteMasterSession() {
+    const sessionId = app.pendingDeleteSessionId;
+    if (!sessionId) return;
+    const button = $("#confirmDeleteSessionButton");
+    button.disabled = true;
+    const { error } = await app.client.rpc("app_delete_master_session", {
+      app_token: app.sessionToken,
+      target_session_id: sessionId,
+    });
+    button.disabled = false;
+    closeDeleteSessionConfirm();
+    if (error) {
+      setStatus("Sessione non eliminata");
+      return;
+    }
+    if (selectedSessionId() === sessionId) {
+      localStorage.removeItem(SESSION_ID_KEY);
+      localStorage.removeItem(CHARACTER_ID_KEY);
+      localStorage.removeItem(MASTER_PREVIEW_KEY);
+      app.currentSession = null;
+      app.currentRole = "";
+    }
+    await loadSessionsAndInvites();
+    renderSessionList();
+    renderSettingsMasterSessions();
+    renderDrawer();
+    setStatus("Sessione eliminata");
+  }
+
   async function loadAdminData() {
     await Promise.all([loadAdminUsers(), loadAdminSessions()]);
   }
@@ -1357,6 +1430,11 @@
     $("#logoutButton").addEventListener("click", signOut);
     $("#changeOwnPasswordButton").addEventListener("click", changeOwnPassword);
     $("#exportCharacterPdfButton").addEventListener("click", exportCurrentCharacterPdf);
+    $("#cancelDeleteSessionButton").addEventListener("click", closeDeleteSessionConfirm);
+    $("#confirmDeleteSessionButton").addEventListener("click", confirmDeleteMasterSession);
+    $("#deleteSessionConfirmBackdrop").addEventListener("click", (event) => {
+      if (event.target.id === "deleteSessionConfirmBackdrop") closeDeleteSessionConfirm();
+    });
     $("#inviteUserSearch").addEventListener("input", debounce(searchInviteUsers, 350));
     $$("[data-theme-mode][data-theme-token]").forEach((input) => {
       input.addEventListener("input", () => applyThemePalette(paletteFromControls()));

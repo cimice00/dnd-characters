@@ -82,6 +82,13 @@
         <button class="small-button" id="changeOwnPasswordButton" type="button">Cambia password</button>
         <button class="small-button" id="logoutButton" type="button">Esci</button>
       </section>
+      <section class="list-panel" id="masterSessionSettingsPanel" hidden>
+        <div class="section-title">
+          <span>Sessioni master</span>
+          <small>Gestione</small>
+        </div>
+        <div class="admin-list" id="masterSessionSettingsList"></div>
+      </section>
       <section class="list-panel">
         <div class="section-title">
           <span>Tema</span>
@@ -467,6 +474,20 @@
         <button class="drawer-nav-button" id="exportCharacterPdfButton" type="button" hidden>Scarica PDF scheda</button>
         <button class="drawer-nav-button" data-nav-target="settings" type="button">Impostazioni</button>
         <button class="drawer-nav-button" data-nav-target="admin" id="adminNavButton" type="button" hidden>Amministrazione</button>
+      </section>
+    </aside>
+
+    <aside class="confirm-backdrop" id="deleteSessionConfirmBackdrop" hidden>
+      <section class="confirm-banner" role="dialog" aria-modal="true" aria-labelledby="deleteSessionConfirmTitle">
+        <div>
+          <span>Conferma eliminazione</span>
+          <strong id="deleteSessionConfirmTitle">Eliminare questa sessione?</strong>
+          <p id="deleteSessionConfirmText">Questa azione rimuove la sessione e le schede collegate.</p>
+        </div>
+        <div class="confirm-actions">
+          <button class="small-button" id="cancelDeleteSessionButton" type="button">Annulla</button>
+          <button class="small-button danger-button" id="confirmDeleteSessionButton" type="button">Elimina</button>
+        </div>
       </section>
     </aside>
 
