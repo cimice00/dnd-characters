@@ -71,6 +71,22 @@ const skills = [
   ["survival", "Sopravvivenza", "wisdom"],
 ];
 
+const conditionPresets = [
+  "Prono",
+  "Avvelenato",
+  "Stordito",
+  "Accecato",
+  "Affascinato",
+  "Spaventato",
+  "Incapacitato",
+  "Invisibile",
+  "Paralizzato",
+  "Pietrificato",
+  "Rallentato",
+  "A terra",
+  "Concentrato",
+];
+
 const defaultState = {
   session: "La Miniera Perduta",
   name: "Aelar",
@@ -84,6 +100,7 @@ const defaultState = {
   speed: "9 m",
   deathSuccesses: 0,
   deathFailures: 0,
+  conditions: [],
   hitDice: "2d8",
   proficiency: 2,
   inspiration: false,
@@ -132,6 +149,9 @@ const defaultState = {
     { name: "Arco corto", description: "Gittata 24/96 m. 1d6 danni perforanti." },
     { name: "Faretra", description: "Contiene fino a 20 frecce." },
     { name: "Arnesi da scasso", description: "Usati per serrature, trappole e piccoli meccanismi." },
+  ],
+  resources: [
+    { name: "Frecce", current: 17, max: 20 },
   ],
   treasure: "",
   background: "Criminale",
@@ -195,6 +215,12 @@ function mergeState(base, patch) {
   }
   if (!Array.isArray(next.customSpells)) {
     next.customSpells = [];
+  }
+  if (!Array.isArray(next.conditions)) {
+    next.conditions = [];
+  }
+  if (!Array.isArray(next.resources)) {
+    next.resources = [];
   }
   return next;
 }
@@ -740,6 +766,112 @@ function bindCustomSpellForm() {
   document.getElementById("addCustomSpellButton")?.addEventListener("click", addCustomSpell);
 }
 
+function renderConditions() {
+  const list = document.getElementById("conditionList");
+  if (!list) return;
+  const selected = new Set(state.conditions || []);
+  const customConditions = (state.conditions || []).filter((condition) => !conditionPresets.includes(condition));
+  list.innerHTML = [
+    ...conditionPresets.map(
+      (condition) => `
+        <label class="condition-chip ${selected.has(condition) ? "active" : ""}">
+          <input data-condition="${escapeAttribute(condition)}" type="checkbox" ${selected.has(condition) ? "checked" : ""} />
+          <span>${escapeHtml(condition)}</span>
+        </label>
+      `
+    ),
+    ...customConditions.map(
+      (condition) => `
+        <button class="condition-chip active custom-condition-chip" data-remove-condition="${escapeAttribute(condition)}" type="button">
+          <span>${escapeHtml(condition)}</span>
+          <strong>x</strong>
+        </button>
+      `
+    ),
+  ].join("");
+
+  list.querySelectorAll("[data-condition]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const condition = input.dataset.condition;
+      if (input.checked && !state.conditions.includes(condition)) {
+        state.conditions.push(condition);
+      }
+      if (!input.checked) {
+        state.conditions = state.conditions.filter((item) => item !== condition);
+      }
+      saveState();
+      renderConditions();
+    });
+  });
+
+  list.querySelectorAll("[data-remove-condition]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.conditions = state.conditions.filter((item) => item !== button.dataset.removeCondition);
+      saveState();
+      renderConditions();
+    });
+  });
+}
+
+function addCustomCondition() {
+  const input = document.getElementById("customConditionInput");
+  const condition = input?.value.trim();
+  if (!condition) return;
+  if (!state.conditions.includes(condition)) {
+    state.conditions.push(condition);
+  }
+  input.value = "";
+  saveState();
+  renderConditions();
+}
+
+function bindCustomConditionForm() {
+  const input = document.getElementById("customConditionInput");
+  document.getElementById("addCustomConditionButton")?.addEventListener("click", addCustomCondition);
+  input?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addCustomCondition();
+    }
+  });
+}
+
+function renderResources() {
+  const list = document.getElementById("resourceList");
+  if (!list) return;
+  list.innerHTML = state.resources.length
+    ? state.resources
+        .map(
+          (resource, index) => `
+            <article class="resource-row">
+              <label><span>Nome</span><input data-resource="${index}" data-resource-field="name" value="${escapeAttribute(resource.name)}" /></label>
+              <label><span>Attuale</span><input data-resource="${index}" data-resource-field="current" type="number" inputmode="numeric" value="${escapeAttribute(resource.current)}" /></label>
+              <label><span>Max</span><input data-resource="${index}" data-resource-field="max" type="number" inputmode="numeric" value="${escapeAttribute(resource.max)}" /></label>
+              <button class="small-button remove-resource" data-remove-resource="${index}" type="button">Rimuovi</button>
+            </article>
+          `
+        )
+        .join("")
+    : `<div class="empty-state">Nessuna risorsa.</div>`;
+
+  list.querySelectorAll("[data-resource]").forEach((field) => {
+    field.addEventListener("input", () => {
+      const index = Number(field.dataset.resource);
+      const key = field.dataset.resourceField;
+      state.resources[index][key] = field.type === "number" ? Number(field.value) : field.value;
+      saveState();
+    });
+  });
+
+  list.querySelectorAll("[data-remove-resource]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.resources.splice(Number(button.dataset.removeResource), 1);
+      renderResources();
+      saveState();
+    });
+  });
+}
+
 function renderEquipment() {
   const list = document.getElementById("equipmentList");
   list.innerHTML = state.equipmentItems
@@ -822,6 +954,11 @@ function bindActions() {
     renderEquipment();
     saveState();
   });
+  document.getElementById("addResourceButton").addEventListener("click", () => {
+    state.resources.push({ name: "Nuova risorsa", current: 0, max: 0 });
+    renderResources();
+    saveState();
+  });
   document.getElementById("addAttackButton").addEventListener("click", () => {
     state.attacks.push({ name: "", bonus: "", damage: "" });
     renderAttacks();
@@ -869,10 +1006,13 @@ function init() {
   populateSpellFilters();
   renderSpellPicker();
   renderEquipment();
+  renderConditions();
+  renderResources();
   bindDeathSaves();
   bindActions();
   bindSpellFilters();
   bindCustomSpellForm();
+  bindCustomConditionForm();
 }
 
 init();

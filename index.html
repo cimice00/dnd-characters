@@ -288,6 +288,8 @@
       <nav class="tab-bar" aria-label="Sezioni scheda">
         <button class="tab-button active" data-tab="skills" type="button">Abilità</button>
         <button class="tab-button" data-tab="magic" type="button">Magia</button>
+        <button class="tab-button" data-tab="conditions" type="button">Condizioni</button>
+        <button class="tab-button" data-tab="resources" type="button">Risorse</button>
         <button class="tab-button" data-tab="inventory" type="button">Borsa</button>
         <button class="tab-button" data-tab="story" type="button">Storia</button>
       </nav>
@@ -415,6 +417,29 @@
             </details>
           </section>
         </details>
+      </section>
+
+      <section class="tab-panel" id="conditions">
+        <div class="section-title">
+          <span>Condizioni & stati</span>
+          <small>attivi</small>
+        </div>
+        <div class="condition-grid" id="conditionList"></div>
+        <div class="custom-condition-row">
+          <label class="field">
+            <span>Condizione personalizzata</span>
+            <input id="customConditionInput" type="text" autocomplete="off" />
+          </label>
+          <button class="small-button" id="addCustomConditionButton" type="button">Aggiungi</button>
+        </div>
+      </section>
+
+      <section class="tab-panel" id="resources">
+        <div class="section-title action-title">
+          <span>Risorse</span>
+          <button class="small-button" id="addResourceButton" type="button">+</button>
+        </div>
+        <div class="resource-list" id="resourceList"></div>
       </section>
 
       <section class="tab-panel" id="inventory">

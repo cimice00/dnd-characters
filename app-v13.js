@@ -304,6 +304,7 @@
       speed: "9 m",
       deathSuccesses: 0,
       deathFailures: 0,
+      conditions: [],
       hitDice: "",
       proficiency: 2,
       inspiration: false,
@@ -328,6 +329,7 @@
       proficienciesLanguages: "",
       equipment: "",
       equipmentItems: [],
+      resources: [],
       treasure: "",
       background: "",
       alignment: "",
@@ -800,6 +802,7 @@
       ["Ispirazione", state.inspiration ? "Si" : "No"],
       ["Percezione passiva", state.passivePerception],
       ["TS morte", `Successi ${Number(state.deathSuccesses) || 0}, fallimenti ${Number(state.deathFailures) || 0}`],
+      ["Condizioni e stati", formatConditions(state)],
     ]);
 
     addPdfSection(lines, "Caratteristiche");
@@ -839,6 +842,7 @@
     addPdfSection(lines, "Equipaggiamento e tesoro");
     addPdfKeyValues(lines, [
       ["Monete", `MR ${Number(state.coinMr) || 0}, MA ${Number(state.coinMa) || 0}, ME ${Number(state.coinMe) || 0}, MO ${Number(state.coinMo) || 0}, MP ${Number(state.coinMp) || 0}`],
+      ["Risorse", formatResources(state.resources)],
       ["Equipaggiamento", state.equipment],
       ["Tesoro", state.treasure],
     ]);
@@ -1017,6 +1021,23 @@
     return value;
   }
 
+  function formatConditions(state) {
+    const conditions = Array.isArray(state.conditions) ? [...state.conditions] : [];
+    if ((Number(state.hpCurrent) || 0) <= 0 && !conditions.includes("A terra")) {
+      conditions.unshift("A terra");
+    }
+    return conditions.filter(Boolean).join(", ") || "-";
+  }
+
+  function formatResources(resources, limit = Infinity) {
+    if (!Array.isArray(resources) || !resources.length) return "-";
+    const shown = resources
+      .filter((resource) => resource?.name)
+      .slice(0, limit)
+      .map((resource) => `${resource.name}: ${valueOrDash(resource.current)}/${valueOrDash(resource.max)}`);
+    return shown.join(", ") || "-";
+  }
+
   function safeFileName(value) {
     return pdfSafeText(value || "personaggio").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "personaggio";
   }
@@ -1074,6 +1095,8 @@
     const hpTemp = Number(data.hpTemp) || 0;
     const hpPercent = hpMax > 0 ? Math.max(0, Math.min(100, Math.round((hpCurrent / hpMax) * 100))) : 0;
     const status = hpCurrent <= 0 ? "A terra" : "Attivo";
+    const conditionSummary = masterConditionSummary(data);
+    const resourceSummary = formatResources(data.resources, 3);
     const owner = character.ownerProfile?.display_name || character.ownerProfile?.username || "Giocatore";
     return `
       <article class="master-character-card">
@@ -1084,6 +1107,7 @@
           </div>
           <span class="status-pill ${hpCurrent <= 0 ? "danger" : ""}">${status}</span>
         </div>
+        ${conditionSummary ? `<div class="master-condition-line">${conditionSummary.map((condition) => `<span>${escapeHtml(condition)}</span>`).join("")}</div>` : ""}
         <div class="hp-meter" aria-label="Punti ferita">
           <span style="width:${hpPercent}%"></span>
         </div>
@@ -1092,6 +1116,8 @@
           <span>Temp <strong>${hpTemp}</strong></span>
           <span>CA <strong>${escapeHtml(data.armorClass ?? "-")}</strong></span>
           <span>TS morte <strong>${Number(data.deathSuccesses) || 0}/${Number(data.deathFailures) || 0}</strong></span>
+          <span>Vel. <strong>${escapeHtml(data.speed || "-")}</strong></span>
+          <span>Risorse <strong>${escapeHtml(resourceSummary)}</strong></span>
         </div>
         <div class="master-card-actions">
           <small class="live-line">Aggiornato ${formatTime(character.updated_at)}</small>
@@ -1099,6 +1125,16 @@
         </div>
       </article>
     `;
+  }
+
+  function masterConditionSummary(data) {
+    const conditions = Array.isArray(data.conditions) ? data.conditions.filter(Boolean) : [];
+    const summary = [];
+    if ((Number(data.hpCurrent) || 0) <= 0 && !conditions.includes("A terra")) summary.push("A terra");
+    conditions.slice(0, 4).forEach((condition) => {
+      if (!summary.includes(condition)) summary.push(condition);
+    });
+    return summary;
   }
 
   function openCharacterPreview(characterId) {
