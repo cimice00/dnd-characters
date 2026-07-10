@@ -274,20 +274,6 @@ button {
   overflow-wrap: anywhere;
 }
 
-.section-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  justify-content: flex-end;
-  min-width: 0;
-}
-
-#exportSessionPdfButton {
-  max-width: 100%;
-  white-space: normal;
-}
-
 .hp-row {
   display: grid;
   grid-template-columns: 56px 1fr 56px;
@@ -1329,6 +1315,13 @@ summary {
 .master-character-list {
   display: grid;
   gap: 10px;
+}
+
+.master-export-button {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 10px;
+  text-align: center;
 }
 
 .master-character-card {
