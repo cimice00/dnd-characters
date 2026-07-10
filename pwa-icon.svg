@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#17130f"/>
+  <path d="M256 54 424 151v210L256 458 88 361V151z" fill="#231d17" stroke="#d8ae5f" stroke-width="20"/>
+  <path d="M256 96 386 172v168L256 416 126 340V172z" fill="#2f2821" stroke="#57483a" stroke-width="10"/>
+  <text x="256" y="286" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="112" font-weight="800" fill="#f7eee2">D20</text>
+</svg>

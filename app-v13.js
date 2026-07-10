@@ -4,7 +4,9 @@
   const SESSION_ID_KEY = "dnd-mobile-session-id-v1";
   const CHARACTER_ID_KEY = "dnd-mobile-character-id-v1";
   const MASTER_PREVIEW_KEY = "dnd-master-character-preview-v1";
-  const APP_VERSION = "1.6.0";
+  const APP_VERSION = "1.7.0";
+  const OFFLINE_DB_NAME = "dnd-offline-first-v1";
+  const OFFLINE_DB_VERSION = 1;
   const DEFAULT_THEME_PALETTE = {
     dark: { background: "#17130f", surface: "#231d17", accent: "#d8ae5f", muted: "#b9aa99" },
     light: { background: "#f0ece4", surface: "#fff8ee", accent: "#7f5217", muted: "#766755" },
@@ -71,6 +73,10 @@
     masterPollTimer: null,
     pendingDeleteSessionId: "",
     saveTimer: null,
+    db: null,
+    offlineReady: false,
+    isOnline: navigator.onLine,
+    syncTimer: null,
     config: window.DND_APP_CONFIG || {},
     readOnlyCharacter: false,
     sessionToken: localStorage.getItem(APP_TOKEN_KEY) || "",
@@ -115,6 +121,236 @@
   function setStatus(message) {
     setText("#syncStatus", message);
     if (!app.user) setText("#loginStatus", message);
+  }
+
+  function setCharacterSyncBanner(state, detail) {
+    const banner = $("#characterSyncBanner");
+    if (!banner) return;
+    banner.hidden = !state && !detail;
+    if (state) setText("#characterSyncState", state);
+    if (detail) setText("#characterSyncDetail", detail);
+  }
+
+  function registerServiceWorker() {
+    if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+    navigator.serviceWorker.register("./sw.js").catch(() => {
+      setStatus("PWA non installata");
+    });
+  }
+
+  function openOfflineDb() {
+    if (app.db) return Promise.resolve(app.db);
+    if (!("indexedDB" in window)) return Promise.reject(new Error("IndexedDB non disponibile"));
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(OFFLINE_DB_NAME, OFFLINE_DB_VERSION);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains("local_profiles")) db.createObjectStore("local_profiles", { keyPath: "id" });
+        if (!db.objectStoreNames.contains("local_sessions")) db.createObjectStore("local_sessions", { keyPath: "id" });
+        if (!db.objectStoreNames.contains("local_characters")) db.createObjectStore("local_characters", { keyPath: "id" });
+        if (!db.objectStoreNames.contains("local_spells")) db.createObjectStore("local_spells", { keyPath: "id" });
+        if (!db.objectStoreNames.contains("sync_queue")) db.createObjectStore("sync_queue", { keyPath: "id" });
+        if (!db.objectStoreNames.contains("local_meta")) db.createObjectStore("local_meta", { keyPath: "key" });
+      };
+      request.onsuccess = () => {
+        app.db = request.result;
+        app.offlineReady = true;
+        resolve(app.db);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function withOfflineStore(storeName, mode, callback) {
+    const db = await openOfflineDb();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(storeName, mode);
+      const store = transaction.objectStore(storeName);
+      let request = null;
+      transaction.oncomplete = () => resolve(request?.result);
+      transaction.onerror = () => reject(transaction.error);
+      try {
+        request = callback(store);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  function idbGet(storeName, key) {
+    return withOfflineStore(storeName, "readonly", (store) => store.get(key));
+  }
+
+  function idbGetAll(storeName) {
+    return withOfflineStore(storeName, "readonly", (store) => store.getAll());
+  }
+
+  function idbPut(storeName, value) {
+    return withOfflineStore(storeName, "readwrite", (store) => store.put(value));
+  }
+
+  function idbDelete(storeName, key) {
+    return withOfflineStore(storeName, "readwrite", (store) => store.delete(key));
+  }
+
+  async function cacheShellData(shellData = {}) {
+    const now = new Date().toISOString();
+    if (shellData.profile?.id) {
+      await idbPut("local_profiles", { ...shellData.profile, cached_at: now, token: app.sessionToken });
+    }
+    const sessions = Array.isArray(shellData.sessions) ? shellData.sessions : [];
+    await Promise.all(
+      sessions
+        .filter((member) => member?.session?.id)
+        .map((member) =>
+          idbPut("local_sessions", {
+            id: member.session.id,
+            role: member.role,
+            session: member.session,
+            profile_id: shellData.profile?.id || app.user?.id || "",
+            cached_at: now,
+          })
+        )
+    );
+    await idbPut("local_meta", { key: "last_shell_sync", value: now });
+  }
+
+  async function loadCachedShell() {
+    const profiles = await idbGetAll("local_profiles").catch(() => []);
+    const profile = profiles.find((item) => item.token === app.sessionToken) || profiles[0] || null;
+    if (!profile) return null;
+    const sessions = (await idbGetAll("local_sessions").catch(() => []))
+      .filter((item) => !item.profile_id || item.profile_id === profile.id)
+      .map((item) => ({ role: item.role, session: item.session }));
+    return { profile, sessions, invites: [] };
+  }
+
+  function normalizeLocalCharacter(character, sessionId = "", ownerId = "") {
+    const now = new Date().toISOString();
+    const data = character?.data || character || {};
+    const id = character?.id || selectedCharacterId() || `local-${sessionId || "session"}-${ownerId || "player"}`;
+    return {
+      id,
+      session_id: character?.session_id || sessionId || data.activeSessionId || selectedSessionId(),
+      owner_id: character?.owner_id || ownerId || app.user?.id || "",
+      ownerProfile: character?.ownerProfile || character?.owner_profile || null,
+      name: character?.name || data.name || "",
+      data,
+      updated_at: character?.updated_at || now,
+      server_updated_at: character?.updated_at || character?.server_updated_at || "",
+      local_updated_at: character?.local_updated_at || now,
+      last_successful_sync_at: character?.last_successful_sync_at || "",
+      sync_status: character?.sync_status || "synced",
+      local_revision: Number(character?.local_revision) || Date.now(),
+    };
+  }
+
+  async function cacheCharacter(character, sessionId = selectedSessionId(), ownerId = app.user?.id, syncStatus = "synced") {
+    if (!character) return null;
+    const record = normalizeLocalCharacter({ ...character, sync_status: syncStatus }, sessionId, ownerId);
+    await idbPut("local_characters", record);
+    if (Array.isArray(record.data?.customSpells)) {
+      await Promise.all(record.data.customSpells.map((spell) => idbPut("local_spells", { ...spell, session_id: record.session_id, cached_at: record.local_updated_at })));
+    }
+    return record;
+  }
+
+  async function findLocalCharacter(sessionId, characterId = selectedCharacterId(), ownerId = app.user?.id) {
+    if (characterId) {
+      const exact = await idbGet("local_characters", characterId).catch(() => null);
+      if (exact) return exact;
+    }
+    const all = await idbGetAll("local_characters").catch(() => []);
+    return (
+      all.find((item) => item.session_id === sessionId && item.owner_id === ownerId) ||
+      all.find((item) => item.session_id === sessionId) ||
+      null
+    );
+  }
+
+  async function saveLocalCharacterSnapshot(syncStatus = "pending") {
+    const sessionId = selectedSessionId();
+    const characterId = selectedCharacterId();
+    if (!sessionId || !characterId || !app.user || app.readOnlyCharacter || app.currentRole === "master") return null;
+    const now = new Date().toISOString();
+    const state = { ...getState(), activeSessionId: sessionId, session: app.currentSession?.name || getState().session, appVersion: APP_VERSION };
+    const previous = await idbGet("local_characters", characterId).catch(() => null);
+    const record = {
+      ...(previous || {}),
+      id: characterId,
+      session_id: sessionId,
+      owner_id: app.user.id,
+      name: state.name || previous?.name || "",
+      data: state,
+      updated_at: now,
+      local_updated_at: now,
+      sync_status: syncStatus,
+      local_revision: Date.now(),
+    };
+    await idbPut("local_characters", record);
+    if (Array.isArray(state.customSpells)) {
+      await Promise.all(state.customSpells.map((spell) => idbPut("local_spells", { ...spell, session_id: sessionId, cached_at: now })));
+    }
+    if (syncStatus !== "synced") await enqueueCharacterSync(record);
+    setCharacterSyncBanner(syncStatus === "synced" ? "Sincronizzata" : "Salvata offline", syncStatus === "synced" ? "La scheda e il database sono allineati." : "La scheda e pronta sul dispositivo e verra sincronizzata appena possibile.");
+    return record;
+  }
+
+  async function enqueueCharacterSync(record) {
+    if (!record?.id) return;
+    await idbPut("sync_queue", {
+      id: `character:${record.id}`,
+      type: "character_upsert",
+      character_id: record.id,
+      session_id: record.session_id,
+      payload: record.data,
+      status: "pending",
+      attempts: 0,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  async function syncPendingQueue() {
+    if (!app.client || !app.user || !app.sessionToken || !navigator.onLine) return { ok: false, message: "Offline" };
+    const queue = await idbGetAll("sync_queue").catch(() => []);
+    const pending = queue.filter((item) => item.status !== "synced");
+    if (!pending.length) return { ok: true, message: "Nessuna modifica in coda" };
+    for (const item of pending) {
+      if (item.type !== "character_upsert") continue;
+      let error = null;
+      try {
+        const response = await app.client.rpc("app_update_character", {
+          app_token: app.sessionToken,
+          target_character_id: item.character_id,
+          character_data: item.payload,
+        });
+        error = response.error;
+      } catch (rpcError) {
+        error = rpcError;
+      }
+      if (error) {
+        await idbPut("sync_queue", { ...item, status: "error", attempts: Number(item.attempts) + 1, updated_at: new Date().toISOString() });
+        return { ok: false, message: "Modifiche salvate offline, DB non raggiungibile" };
+      }
+      const spellSync = await syncCustomSpells(item.payload);
+      if (!spellSync.ok) {
+        await idbPut("sync_queue", { ...item, status: "error", attempts: Number(item.attempts) + 1, updated_at: new Date().toISOString() });
+        return { ok: false, message: "Scheda salvata, incantesimi custom in coda" };
+      }
+      const record = await idbGet("local_characters", item.character_id).catch(() => null);
+      if (record) {
+        const syncedAt = new Date().toISOString();
+        await idbPut("local_characters", { ...record, sync_status: "synced", last_successful_sync_at: syncedAt, server_updated_at: syncedAt });
+      }
+      await idbDelete("sync_queue", item.id);
+    }
+    setCharacterSyncBanner("Sincronizzata", "Le modifiche locali sono arrivate al database.");
+    return { ok: true, message: "Sincronizzato con Supabase" };
+  }
+
+  function scheduleSyncQueue(delay = 1000) {
+    window.clearTimeout(app.syncTimer);
+    app.syncTimer = window.setTimeout(() => syncPendingQueue().catch(() => null), delay);
   }
 
   function profileName(profile = app.profile) {
@@ -422,6 +658,8 @@
     if (adminNav) adminNav.hidden = app.profile?.role !== "admin";
     const exportButton = $("#exportCharacterPdfButton");
     if (exportButton) exportButton.hidden = !selectedCharacterId();
+    const prepareButton = $("#prepareOfflineButton");
+    if (prepareButton) prepareButton.hidden = !app.currentSession;
     renderSettingsMasterSessions();
   }
 
@@ -453,8 +691,37 @@
   }
 
   async function loadProfile() {
-    const { data, error } = await app.client.rpc("app_get_shell", { app_token: app.sessionToken });
+    if (!app.client) {
+      const cached = await loadCachedShell();
+      if (!cached?.profile) throw new Error("Sessione offline non disponibile");
+      app.profile = cached.profile;
+      app.user = cached.profile;
+      app.sessions = cached.sessions || [];
+      app.invites = [];
+      applyThemePalette(app.profile?.theme_palette || DEFAULT_THEME_PALETTE);
+      setStatus("Modalita offline: dati locali");
+      return;
+    }
+    let data = null;
+    let error = null;
+    try {
+      const response = await app.client.rpc("app_get_shell", { app_token: app.sessionToken });
+      data = response.data;
+      error = response.error;
+    } catch (rpcError) {
+      error = rpcError;
+    }
     if (error || !data?.profile) {
+      const cached = await loadCachedShell();
+      if (cached?.profile) {
+        app.profile = cached.profile;
+        app.user = cached.profile;
+        app.sessions = cached.sessions || [];
+        app.invites = [];
+        applyThemePalette(app.profile?.theme_palette || DEFAULT_THEME_PALETTE);
+        setStatus("Supabase non risponde: uso dati offline");
+        return;
+      }
       app.user = null;
       app.profile = null;
       app.sessions = [];
@@ -467,16 +734,45 @@
     app.user = data.profile;
     app.sessions = data.sessions || [];
     app.invites = data.invites || [];
+    await cacheShellData(data).catch(() => null);
     applyThemePalette(app.profile?.theme_palette || DEFAULT_THEME_PALETTE);
   }
 
   async function loadSessionsAndInvites() {
-    const { data, error } = await app.client.rpc("app_get_shell", { app_token: app.sessionToken });
-    if (error || !data?.profile) throw error || new Error("Sessione non valida");
+    if (!app.client) {
+      const cached = await loadCachedShell();
+      if (!cached?.profile) throw new Error("Sessione offline non disponibile");
+      app.profile = cached.profile;
+      app.user = cached.profile;
+      app.sessions = cached.sessions || [];
+      app.invites = [];
+      setStatus("Modalita offline: sessioni locali");
+      return;
+    }
+    let data = null;
+    let error = null;
+    try {
+      const response = await app.client.rpc("app_get_shell", { app_token: app.sessionToken });
+      data = response.data;
+      error = response.error;
+    } catch (rpcError) {
+      error = rpcError;
+    }
+    if (error || !data?.profile) {
+      const cached = await loadCachedShell();
+      if (!cached?.profile) throw error || new Error("Sessione non valida");
+      app.profile = cached.profile;
+      app.user = cached.profile;
+      app.sessions = cached.sessions || [];
+      app.invites = [];
+      setStatus("Supabase non risponde: sessioni locali");
+      return;
+    }
     app.profile = data.profile;
     app.user = data.profile;
     app.sessions = data.sessions || [];
     app.invites = data.invites || [];
+    await cacheShellData(data).catch(() => null);
   }
 
   async function refreshShellData() {
@@ -578,11 +874,19 @@
 
   async function loadSessionForAdmin(sessionId) {
     if (app.profile?.role !== "admin") return null;
+    if (!app.client) {
+      const cached = await idbGet("local_sessions", sessionId).catch(() => null);
+      return cached?.session || null;
+    }
     const { data } = await app.client.rpc("app_get_session_for_admin", { app_token: app.sessionToken, target_session_id: sessionId });
     return data || null;
   }
 
   async function createSessionFromList() {
+    if (!app.client) {
+      setStatus("Creazione sessione disponibile solo online");
+      return;
+    }
     const input = $("#newSessionName");
     const name = input.value.trim() || "Nuova sessione";
     const { data, error } = await app.client.rpc("app_create_session", { app_token: app.sessionToken, session_name: name });
@@ -603,36 +907,83 @@
   async function loadCharacter(session) {
     const localState = getState();
     const currentCharacterId = selectedCharacterId();
-    if (localState.activeSessionId === session.id && currentCharacterId) return;
+    const localCharacter = await findLocalCharacter(session.id, currentCharacterId);
+    if (localState.activeSessionId === session.id && currentCharacterId) {
+      if (localCharacter) {
+        setCharacterSyncBanner(
+          localCharacter.sync_status === "synced" ? "Disponibile offline" : "Salvata offline",
+          localCharacter.sync_status === "synced" ? "Questa scheda e gia pronta su questo dispositivo." : "Ci sono modifiche locali in attesa di database."
+        );
+      }
+      scheduleSyncQueue(1500);
+      return;
+    }
 
-    const { data: character, error } = await app.client.rpc("app_load_character", {
-      app_token: app.sessionToken,
-      target_session_id: session.id,
-      target_character_id: currentCharacterId || null,
-    });
-    if (!error && character?.id) {
-      localStorage.setItem(CHARACTER_ID_KEY, character.id);
-      setState({ ...character.data, activeSessionId: session.id, session: session.name, appVersion: APP_VERSION });
+    if (localCharacter) {
+      localStorage.setItem(CHARACTER_ID_KEY, localCharacter.id);
+      setState({ ...(localCharacter.data || {}), activeSessionId: session.id, session: session.name, appVersion: APP_VERSION });
+      setCharacterSyncBanner("Aperta da dispositivo", "Supabase non serve per aprire questa scheda gia caricata.");
       window.location.reload();
       return;
     }
 
-    const blank = blankCharacterData(session);
-    const { data: created, error: createError } = await app.client.rpc("app_create_character", {
-      app_token: app.sessionToken,
-      target_session_id: session.id,
-      character_data: blank,
-    });
-    if (!createError && created) {
-      localStorage.setItem(CHARACTER_ID_KEY, created.id);
+    if (app.client) {
+      let character = null;
+      let error = null;
+      try {
+        const response = await app.client.rpc("app_load_character", {
+          app_token: app.sessionToken,
+          target_session_id: session.id,
+          target_character_id: currentCharacterId || null,
+        });
+        character = response.data;
+        error = response.error;
+      } catch (rpcError) {
+        error = rpcError;
+      }
+      if (!error && character?.id) {
+        await cacheCharacter(character, session.id, app.user?.id, "synced").catch(() => null);
+        localStorage.setItem(CHARACTER_ID_KEY, character.id);
+        setState({ ...character.data, activeSessionId: session.id, session: session.name, appVersion: APP_VERSION });
+        window.location.reload();
+        return;
+      }
+
+      const blank = blankCharacterData(session);
+      let created = null;
+      let createError = null;
+      try {
+        const response = await app.client.rpc("app_create_character", {
+          app_token: app.sessionToken,
+          target_session_id: session.id,
+          character_data: blank,
+        });
+        created = response.data;
+        createError = response.error;
+      } catch (rpcError) {
+        createError = rpcError;
+      }
+      if (!createError && created) {
+        localStorage.setItem(CHARACTER_ID_KEY, created.id);
+        await cacheCharacter({ id: created.id, data: blank }, session.id, app.user?.id, "synced").catch(() => null);
+        setState(blank);
+        window.location.reload();
+        return;
+      }
+      setState(blank);
+      setStatus("Scheda non trovata offline: aprila online almeno una volta.");
+      return;
     }
+
+    const blank = blankCharacterData(session);
     setState(blank);
-    window.location.reload();
+    setStatus("Scheda non trovata offline: aprila online almeno una volta.");
   }
 
   function queueCharacterSave() {
     if (!app.user || !app.currentSession || app.currentRole === "master" || app.readOnlyCharacter) return;
     window.clearTimeout(app.saveTimer);
+    window.setTimeout(() => saveLocalCharacterSnapshot("pending").catch(() => null), 0);
     app.saveTimer = window.setTimeout(saveCharacter, 900);
   }
 
@@ -644,11 +995,22 @@
       return { ok: false, skipped: true, message: "Salvataggio non disponibile per questa scheda" };
     }
     const state = { ...getState(), activeSessionId: sessionId, appVersion: APP_VERSION };
-    const { error } = await app.client.rpc("app_update_character", {
-      app_token: app.sessionToken,
-      target_character_id: characterId,
-      character_data: state,
-    });
+    await saveLocalCharacterSnapshot("pending").catch(() => null);
+    if (!app.client || !navigator.onLine) {
+      if (!silent) setStatus("Salvato offline");
+      return { ok: false, message: "Salvato offline: sincronizzazione in coda" };
+    }
+    let error = null;
+    try {
+      const response = await app.client.rpc("app_update_character", {
+        app_token: app.sessionToken,
+        target_character_id: characterId,
+        character_data: state,
+      });
+      error = response.error;
+    } catch (rpcError) {
+      error = rpcError;
+    }
     if (error) {
       if (!silent) setStatus("Errore salvataggio");
       return { ok: false, message: "Scheda non sincronizzata" };
@@ -659,18 +1021,26 @@
       return { ok: false, message: "Scheda salvata, incantesimi custom non sincronizzati" };
     }
     if (!silent) setStatus("Salvato");
+    await saveLocalCharacterSnapshot("synced").catch(() => null);
+    await idbDelete("sync_queue", `character:${characterId}`).catch(() => null);
     return { ok: true, message: "Sincronizzato con Supabase" };
   }
 
   async function syncCustomSpells(state = getState()) {
     const sessionId = selectedSessionId();
-    if (!sessionId || !app.user) return { ok: false, message: "Sessione non disponibile" };
+    if (!sessionId || !app.user || !app.client) return { ok: false, message: "Sessione non disponibile" };
     const customSpells = Array.isArray(state.customSpells) ? state.customSpells : [];
-    const { error } = await app.client.rpc("app_sync_custom_spells", {
-      app_token: app.sessionToken,
-      target_session_id: sessionId,
-      custom_spells: customSpells,
-    });
+    let error = null;
+    try {
+      const response = await app.client.rpc("app_sync_custom_spells", {
+        app_token: app.sessionToken,
+        target_session_id: sessionId,
+        custom_spells: customSpells,
+      });
+      error = response.error;
+    } catch (rpcError) {
+      error = rpcError;
+    }
     return error ? { ok: false, message: "Custom spell non sincronizzati" } : { ok: true, message: "Custom spell sincronizzati" };
   }
 
@@ -730,7 +1100,7 @@
         return {
           state,
           title: `${state.name || character.name || "Personaggio senza nome"} - ${owner}`,
-          syncStatus: "Dati riletti dal database al momento dell'esportazione",
+          syncStatus: character.sync_status && character.sync_status !== "synced" ? "Dati da backup locale, sincronizzazione non completata" : "Dati riletti dal database o da copia locale sincronizzata",
         };
       });
       const pdf = buildCharacterBackupPdf(backups, {
@@ -753,6 +1123,39 @@
     if (app.readOnlyCharacter || app.currentRole === "master") return { ok: true, message: "Sola lettura: esportazione senza salvataggio" };
     setStatus("Verifico salvataggio...");
     return saveCharacter({ silent: true });
+  }
+
+  async function prepareOfflineSession() {
+    closeDrawer();
+    if (!app.currentSession) {
+      setStatus("Seleziona prima una sessione");
+      return;
+    }
+    setStatus("Preparo sessione offline...");
+    await idbPut("local_sessions", {
+      id: app.currentSession.id,
+      role: app.currentRole,
+      session: app.currentSession,
+      profile_id: app.user?.id || "",
+      cached_at: new Date().toISOString(),
+      prepared_at: new Date().toISOString(),
+    }).catch(() => null);
+
+    if (app.currentRole === "master" || app.profile?.role === "admin") {
+      await loadMasterCharacters(app.currentSession.id);
+      await idbPut("local_meta", { key: `offline_session:${app.currentSession.id}`, value: new Date().toISOString() }).catch(() => null);
+      setStatus(app.masterCharacters.length ? "Sessione master pronta offline" : "Sessione pronta, nessuna scheda locale");
+      return;
+    }
+
+    await saveLocalCharacterSnapshot("pending").catch(() => null);
+    const syncResult = await syncPendingQueue().catch(() => ({ ok: false }));
+    await idbPut("local_meta", { key: `offline_session:${app.currentSession.id}`, value: new Date().toISOString() }).catch(() => null);
+    setCharacterSyncBanner(
+      syncResult.ok ? "Pronta offline" : "Pronta offline",
+      syncResult.ok ? "Scheda locale e database sincronizzati." : "Scheda salvata sul dispositivo, sync in coda."
+    );
+    setStatus(syncResult.ok ? "Sessione pronta offline" : "Sessione pronta offline, DB non raggiunto");
   }
 
   function buildCharacterBackupPdf(characterBackups, options = {}) {
@@ -1061,17 +1464,35 @@
   }
 
   async function loadMasterCharacters(sessionId) {
-    const { data, error } = await app.client.rpc("app_list_master_characters", {
-      app_token: app.sessionToken,
-      target_session_id: sessionId,
-    });
-    if (error) {
-      app.masterCharacters = [];
+    if (!app.client) {
+      const cached = await idbGetAll("local_characters").catch(() => []);
+      app.masterCharacters = cached.filter((character) => character.session_id === sessionId);
       renderMasterCharacters();
+      setStatus("Dashboard master offline");
+      return;
+    }
+    let data = null;
+    let error = null;
+    try {
+      const response = await app.client.rpc("app_list_master_characters", {
+        app_token: app.sessionToken,
+        target_session_id: sessionId,
+      });
+      data = response.data;
+      error = response.error;
+    } catch (rpcError) {
+      error = rpcError;
+    }
+    if (error) {
+      const cached = await idbGetAll("local_characters").catch(() => []);
+      app.masterCharacters = cached.filter((character) => character.session_id === sessionId);
+      renderMasterCharacters();
+      setStatus(app.masterCharacters.length ? "Dashboard master da dati offline" : "Nessuna scheda offline per questa sessione");
       return;
     }
 
     app.masterCharacters = data || [];
+    await Promise.all(app.masterCharacters.map((character) => cacheCharacter(character, sessionId, character.owner_id || character.ownerProfile?.id || "").catch(() => null)));
     renderMasterCharacters();
   }
 
@@ -1120,7 +1541,7 @@
           <span>Risorse <strong>${escapeHtml(resourceSummary)}</strong></span>
         </div>
         <div class="master-card-actions">
-          <small class="live-line">Aggiornato ${formatTime(character.updated_at)}</small>
+          <small class="live-line">${character.sync_status && character.sync_status !== "synced" ? "Offline" : "Aggiornato"} ${formatTime(character.updated_at || character.local_updated_at)}</small>
           <button class="small-button" data-open-character-sheet="${escapeAttribute(character.id)}" type="button">Apri scheda</button>
         </div>
       </article>
@@ -1461,7 +1882,15 @@
       return;
     }
     $("#loginStatus").textContent = "Accesso...";
-    const { data, error } = await app.client.rpc("app_login_account", { target_username: username, target_password: password });
+    let data = null;
+    let error = null;
+    try {
+      const response = await app.client.rpc("app_login_account", { target_username: username, target_password: password });
+      data = response.data;
+      error = response.error;
+    } catch (rpcError) {
+      error = rpcError;
+    }
     if (error) {
       $("#loginStatus").textContent = "Accesso non riuscito.";
       return;
@@ -1476,7 +1905,7 @@
 
   async function signOut() {
     stopMasterRealtime();
-    if (app.sessionToken) {
+    if (app.sessionToken && app.client) {
       await app.client.rpc("app_logout_account", { app_token: app.sessionToken });
     }
     app.user = null;
@@ -1508,6 +1937,8 @@
     $("#changeOwnPasswordButton").addEventListener("click", changeOwnPassword);
     $("#exportCharacterPdfButton").addEventListener("click", exportCurrentCharacterPdf);
     $("#exportSessionPdfButton").addEventListener("click", exportMasterSessionPdf);
+    $("#prepareOfflineButton").addEventListener("click", prepareOfflineSession);
+    $("#prepareOfflineMasterButton").addEventListener("click", prepareOfflineSession);
     $("#cancelDeleteSessionButton").addEventListener("click", closeDeleteSessionConfirm);
     $("#confirmDeleteSessionButton").addEventListener("click", confirmDeleteMasterSession);
     $("#deleteSessionConfirmBackdrop").addEventListener("click", (event) => {
@@ -1560,14 +1991,36 @@
   async function init() {
     bindEvents();
     showView("auth");
+    registerServiceWorker();
+    await openOfflineDb().catch(() => {
+      app.offlineReady = false;
+      setStatus("Archivio offline non disponibile");
+    });
+
+    window.addEventListener("online", () => {
+      app.isOnline = true;
+      setStatus("Connessione tornata: sincronizzo...");
+      scheduleSyncQueue(300);
+    });
+    window.addEventListener("offline", () => {
+      app.isOnline = false;
+      setStatus("Offline: uso dati locali");
+      setCharacterSyncBanner("Offline", "Le modifiche restano sul dispositivo.");
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") saveLocalCharacterSnapshot("pending").catch(() => null);
+      if (document.visibilityState === "visible") scheduleSyncQueue(500);
+    });
 
     if (!app.config.supabaseUrl || !app.config.supabaseAnonKey || !window.supabase?.createClient) {
-      $("#loginStatus").textContent = "Supabase non configurato.";
+      await routeAfterAuth();
+      if (!app.sessionToken) $("#loginStatus").textContent = "Supabase non configurato.";
       return;
     }
 
     app.client = window.supabase.createClient(app.config.supabaseUrl, app.config.supabaseAnonKey);
     await routeAfterAuth();
+    scheduleSyncQueue(1200);
   }
 
   init();

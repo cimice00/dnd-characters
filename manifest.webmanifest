@@ -1,0 +1,19 @@
+{
+  "name": "Compendio Personaggi D&D",
+  "short_name": "DnD Sheet",
+  "version": "1.7.0",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#17130f",
+  "theme_color": "#17130f",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
