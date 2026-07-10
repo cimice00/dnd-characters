@@ -1447,26 +1447,42 @@ summary {
 
 .sync-banner {
   display: grid;
+  grid-template-rows: 13px 36px;
   gap: 4px;
+  align-content: center;
+  min-height: 70px;
   margin: 0 14px 12px;
   padding: 10px 12px;
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel-bg);
 }
 
+#characterSyncBanner[hidden] {
+  display: grid !important;
+  visibility: hidden;
+}
+
 .sync-banner span {
+  overflow: hidden;
   color: var(--muted);
   font-size: 11px;
   font-weight: 900;
+  line-height: 13px;
+  text-overflow: ellipsis;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .sync-banner strong {
-  display: block;
+  display: -webkit-box;
+  overflow: hidden;
   margin-top: 2px;
   font-size: 13px;
   line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .master-character-list {
