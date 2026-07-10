@@ -1,4 +1,4 @@
-const CACHE_VERSION = "dnd-pwa-v1.7.0";
+const CACHE_VERSION = "dnd-pwa-v1.7.1";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -15,7 +15,7 @@ const APP_SHELL = [
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION)
-      .then((cache) => cache.addAll(APP_SHELL))
+      .then((cache) => Promise.allSettled(APP_SHELL.map((asset) => cache.add(new Request(asset, { cache: "reload" })))))
       .then(() => self.skipWaiting())
   );
 });
@@ -59,7 +59,7 @@ self.addEventListener("fetch", (event) => {
           }
           return response;
         })
-        .catch(() => caches.match("./offline.html"));
+        .catch(() => new Response("", { status: 504, statusText: "Offline" }));
     })
   );
 });

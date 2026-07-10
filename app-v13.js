@@ -7,6 +7,7 @@
   const APP_VERSION = "1.7.0";
   const OFFLINE_DB_NAME = "dnd-offline-first-v1";
   const OFFLINE_DB_VERSION = 1;
+  const SUPABASE_CDN_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
   const DEFAULT_THEME_PALETTE = {
     dark: { background: "#17130f", surface: "#231d17", accent: "#d8ae5f", muted: "#b9aa99" },
     light: { background: "#f0ece4", surface: "#fff8ee", accent: "#7f5217", muted: "#766755" },
@@ -133,9 +134,35 @@
 
   function registerServiceWorker() {
     if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
-    navigator.serviceWorker.register("./sw.js").catch(() => {
-      setStatus("PWA non installata");
+    navigator.serviceWorker
+      .register("./sw.js")
+      .then((registration) => registration.update().catch(() => null))
+      .catch(() => {
+        setStatus("PWA non installata");
+      });
+  }
+
+  function loadSupabaseLibrary() {
+    if (window.supabase?.createClient) return Promise.resolve(true);
+    if (!navigator.onLine) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = SUPABASE_CDN_URL;
+      script.async = true;
+      script.onload = () => resolve(Boolean(window.supabase?.createClient));
+      script.onerror = () => resolve(false);
+      window.setTimeout(() => resolve(Boolean(window.supabase?.createClient)), 3500);
+      document.head.appendChild(script);
     });
+  }
+
+  async function ensureSupabaseClient() {
+    if (app.client) return true;
+    if (!app.config.supabaseUrl || !app.config.supabaseAnonKey) return false;
+    const loaded = await loadSupabaseLibrary();
+    if (!loaded || !window.supabase?.createClient) return false;
+    app.client = window.supabase.createClient(app.config.supabaseUrl, app.config.supabaseAnonKey);
+    return true;
   }
 
   function openOfflineDb() {
@@ -1871,7 +1898,8 @@
   }
 
   async function signIn() {
-    if (!app.client) {
+    const hasClient = await ensureSupabaseClient();
+    if (!hasClient) {
       $("#loginStatus").textContent = "Configurazione Supabase mancante.";
       return;
     }
@@ -2012,13 +2040,13 @@
       if (document.visibilityState === "visible") scheduleSyncQueue(500);
     });
 
-    if (!app.config.supabaseUrl || !app.config.supabaseAnonKey || !window.supabase?.createClient) {
+    const hasClient = await ensureSupabaseClient();
+    if (!hasClient) {
       await routeAfterAuth();
       if (!app.sessionToken) $("#loginStatus").textContent = "Supabase non configurato.";
       return;
     }
 
-    app.client = window.supabase.createClient(app.config.supabaseUrl, app.config.supabaseAnonKey);
     await routeAfterAuth();
     scheduleSyncQueue(1200);
   }
