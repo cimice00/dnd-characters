@@ -131,11 +131,9 @@ const defaultState = {
     { name: "Arco corto", bonus: "+5", damage: "1d6+3 perforante" },
     { name: "Dardo di Fuoco", bonus: "+5", damage: "1d10 fuoco" },
   ],
-  slots: Array.from({ length: 9 }, (_, index) => ({
-    level: index + 1,
-    current: index < 2 ? 2 : 0,
-    max: index < 2 ? 2 : 0,
-  })),
+  slots: [
+    { level: 1, current: 2, max: 2 },
+  ],
   cantrips: "Mano Magica\nIllusione Minore",
   spells: "Caduta Morbida\nCharme su Persone",
   knownSpellIds: [],
@@ -399,21 +397,49 @@ function escapeHtml(value) {
 
 function renderSlots() {
   const grid = document.getElementById("slotsGrid");
-  grid.innerHTML = state.slots
-    .map(
-      (slot, index) => `
-        <article class="slot-card">
-          <span>Liv. ${slot.level}</span>
-          <input data-slot="${index}" data-slot-field="current" type="number" inputmode="numeric" value="${slot.current}" aria-label="Slot livello ${slot.level} rimasti" />
-          <input data-slot="${index}" data-slot-field="max" type="number" inputmode="numeric" value="${slot.max}" aria-label="Slot livello ${slot.level} massimi" />
-        </article>
-      `
-    )
-    .join("");
+  const levelSelect = document.getElementById("slotLevelToAdd");
+  const slots = Array.isArray(state.slots) ? state.slots : [];
+  slots.sort((a, b) => Number(a.level) - Number(b.level));
+  if (levelSelect) {
+    const usedLevels = new Set(slots.map((slot) => Number(slot.level)));
+    const options = Array.from({ length: 9 }, (_, index) => index + 1).filter((level) => !usedLevels.has(level));
+    levelSelect.innerHTML = options.length
+      ? options.map((level) => `<option value="${level}">Livello ${level}</option>`).join("")
+      : `<option value="">Tutti aggiunti</option>`;
+    levelSelect.disabled = !options.length;
+  }
+  grid.innerHTML = slots.length
+    ? slots
+        .map(
+          (slot, index) => `
+            <article class="slot-card">
+              <span>Liv. ${slot.level}</span>
+              <label>
+                <small>RIM</small>
+                <input data-slot="${index}" data-slot-field="current" type="number" inputmode="numeric" value="${slot.current}" aria-label="Slot livello ${slot.level} rimasti" />
+              </label>
+              <label>
+                <small>MAX</small>
+                <input data-slot="${index}" data-slot-field="max" type="number" inputmode="numeric" value="${slot.max}" aria-label="Slot livello ${slot.level} massimi" />
+              </label>
+              <button class="small-button remove-slot" data-remove-slot="${index}" type="button">Rimuovi</button>
+            </article>
+          `
+        )
+        .join("")
+    : `<div class="empty-state">Nessuno slot. Aggiungi solo i livelli disponibili per il personaggio.</div>`;
 
   grid.querySelectorAll("[data-slot]").forEach((input) => {
     input.addEventListener("input", () => {
       state.slots[Number(input.dataset.slot)][input.dataset.slotField] = Number(input.value);
+      saveState();
+    });
+  });
+
+  grid.querySelectorAll("[data-remove-slot]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.slots.splice(Number(button.dataset.removeSlot), 1);
+      renderSlots();
       saveState();
     });
   });
@@ -957,6 +983,13 @@ function bindActions() {
   document.getElementById("addResourceButton").addEventListener("click", () => {
     state.resources.push({ name: "Nuova risorsa", current: 0, max: 0 });
     renderResources();
+    saveState();
+  });
+  document.getElementById("addSlotButton").addEventListener("click", () => {
+    const level = Number(document.getElementById("slotLevelToAdd")?.value);
+    if (!level || state.slots.some((slot) => Number(slot.level) === level)) return;
+    state.slots.push({ level, current: 0, max: 0 });
+    renderSlots();
     saveState();
   });
   document.getElementById("addAttackButton").addEventListener("click", () => {

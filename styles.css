@@ -659,8 +659,31 @@ summary {
   gap: 8px;
 }
 
+.slot-manager-head {
+  display: grid;
+  gap: 10px;
+}
+
+.slot-add-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.slot-add-row select {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--field-bg);
+  color: var(--text);
+  padding: 0 10px;
+}
+
 .slots-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
 }
 
 .slot-card {
@@ -682,6 +705,18 @@ summary {
   text-transform: uppercase;
 }
 
+.slot-card label {
+  display: grid;
+  gap: 4px;
+}
+
+.slot-card small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  text-align: center;
+}
+
 .slot-card input {
   width: 100%;
   height: 36px;
@@ -691,6 +726,11 @@ summary {
   color: var(--text);
   text-align: center;
   font-weight: 800;
+}
+
+.remove-slot {
+  grid-column: 1 / -1;
+  min-height: 34px;
 }
 
 .spell-picker {

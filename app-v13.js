@@ -322,7 +322,7 @@
       saveProficiencies: {},
       skillProficiencies: {},
       attacks: [{ name: "", bonus: "", damage: "" }],
-      slots: Array.from({ length: 9 }, (_, index) => ({ level: index + 1, current: 0, max: 0 })),
+      slots: [],
       knownSpellIds: [],
       preparedSpellIds: [],
       customSpells: [],
