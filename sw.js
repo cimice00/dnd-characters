@@ -1,4 +1,4 @@
-const CACHE_VERSION = "dnd-pwa-v1.7.1";
+const CACHE_VERSION = "dnd-pwa-v1.7.2";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -15,7 +15,7 @@ const APP_SHELL = [
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION)
-      .then((cache) => Promise.allSettled(APP_SHELL.map((asset) => cache.add(new Request(asset, { cache: "reload" })))))
+      .then((cache) => cache.addAll(APP_SHELL.map((asset) => new Request(asset, { cache: "reload" }))))
       .then(() => self.skipWaiting())
   );
 });
@@ -49,7 +49,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    caches.match(request).then((cached) => {
+    caches.match(request, { ignoreSearch: true }).then((cached) => {
       if (cached) return cached;
       return fetch(request)
         .then((response) => {

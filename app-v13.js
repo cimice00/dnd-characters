@@ -380,6 +380,27 @@
     app.syncTimer = window.setTimeout(() => syncPendingQueue().catch(() => null), delay);
   }
 
+  function hasEmergencyLocalSheet() {
+    const state = getState();
+    return Boolean(state && (state.activeSessionId || state.name || state.classLevel || state.hpMax || selectedCharacterId()));
+  }
+
+  function openEmergencyLocalSheet(reason = "Supabase non risponde: apro l'ultima scheda salvata su questo dispositivo.") {
+    const state = getState();
+    const sessionId = state.activeSessionId || selectedSessionId() || "offline-local-session";
+    app.user = app.user || { id: "offline-local-user", username: "offline", display_name: "Offline" };
+    app.profile = app.profile || app.user;
+    app.currentSession = { id: sessionId, name: state.session || "Sessione offline" };
+    app.currentRole = "player";
+    app.readOnlyCharacter = false;
+    setSessionTitle(app.currentSession.name);
+    renderDrawer();
+    showView("character");
+    setCharacterSyncBanner("Emergenza offline", reason);
+    setStatus("Offline: scheda locale aperta");
+    window.DND_APP_BOOTED = true;
+  }
+
   function profileName(profile = app.profile) {
     return profile?.display_name || profile?.username || "Utente";
   }
@@ -811,6 +832,10 @@
 
   async function routeAfterAuth() {
     if (!app.sessionToken) {
+      if (!navigator.onLine && hasEmergencyLocalSheet()) {
+        openEmergencyLocalSheet("Nessuna connessione: uso la scheda gia salvata nel browser.");
+        return;
+      }
       app.user = null;
       localStorage.removeItem(SESSION_ID_KEY);
       localStorage.removeItem(CHARACTER_ID_KEY);
@@ -822,6 +847,10 @@
     try {
       await refreshShellData();
     } catch {
+      if (!navigator.onLine && hasEmergencyLocalSheet()) {
+        openEmergencyLocalSheet("Account non verificabile offline: uso la scheda locale gia presente.");
+        return;
+      }
       localStorage.removeItem(APP_TOKEN_KEY);
       app.sessionToken = "";
       app.user = null;
@@ -841,6 +870,10 @@
 
     const membership = app.sessions.find((item) => item.session.id === sessionId);
     if (!membership && app.profile?.role !== "admin") {
+      if (!navigator.onLine && hasEmergencyLocalSheet()) {
+        openEmergencyLocalSheet("Sessione non verificabile offline: apro la copia locale.");
+        return;
+      }
       localStorage.removeItem(SESSION_ID_KEY);
       localStorage.removeItem(CHARACTER_ID_KEY);
       showView("sessions");
@@ -850,6 +883,10 @@
     app.currentSession = membership?.session || (await loadSessionForAdmin(sessionId));
     app.currentRole = membership?.role || (app.profile?.role === "admin" ? "admin" : "");
     if (!app.currentSession) {
+      if (!navigator.onLine && hasEmergencyLocalSheet()) {
+        openEmergencyLocalSheet("Sessione non disponibile offline: apro la scheda locale.");
+        return;
+      }
       localStorage.removeItem(SESSION_ID_KEY);
       showView("sessions");
       return;
@@ -2017,6 +2054,7 @@
   }
 
   async function init() {
+    window.DND_APP_BOOTED = false;
     bindEvents();
     showView("auth");
     registerServiceWorker();
@@ -2044,12 +2082,22 @@
     if (!hasClient) {
       await routeAfterAuth();
       if (!app.sessionToken) $("#loginStatus").textContent = "Supabase non configurato.";
+      window.DND_APP_BOOTED = true;
       return;
     }
 
     await routeAfterAuth();
+    window.DND_APP_BOOTED = true;
     scheduleSyncQueue(1200);
   }
 
-  init();
+  init().catch(() => {
+    if (!navigator.onLine && hasEmergencyLocalSheet()) {
+      openEmergencyLocalSheet("Avvio offline di emergenza: uso i dati salvati sul dispositivo.");
+      return;
+    }
+    showView("auth");
+    setText("#loginStatus", "Avvio non riuscito. Riprova online.");
+    window.DND_APP_BOOTED = true;
+  });
 })();
