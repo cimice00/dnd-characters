@@ -1,6 +1,5 @@
-const CACHE_VERSION = "dnd-pwa-v1.7.3";
+const CACHE_VERSION = "dnd-pwa-v1.7.4";
 const APP_SHELL = [
-  "./",
   "./index.html",
   "./offline.html",
   "./styles.css",
@@ -12,10 +11,31 @@ const APP_SHELL = [
   "./pwa-icon.svg"
 ];
 
+async function cleanRedirectedResponse(response) {
+  if (!response || !response.redirected) return response;
+  const body = await response.blob();
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
+
+async function cacheAppShell(cache) {
+  await Promise.all(
+    APP_SHELL.map(async (asset) => {
+      const request = new Request(asset, { cache: "reload" });
+      const response = await fetch(request);
+      if (!response.ok) throw new Error(`Asset non disponibile: ${asset}`);
+      await cache.put(asset, await cleanRedirectedResponse(response));
+    })
+  );
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION)
-      .then((cache) => cache.addAll(APP_SHELL.map((asset) => new Request(asset, { cache: "reload" }))))
+      .then(cacheAppShell)
       .then(() => self.skipWaiting())
   );
 });
@@ -38,26 +58,35 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_VERSION).then((cache) => cache.put("./index.html", copy));
-          return response;
+        .then(async (response) => {
+          const clean = await cleanRedirectedResponse(response);
+          if (clean.ok) {
+            const copy = clean.clone();
+            caches.open(CACHE_VERSION).then((cache) => cache.put("./index.html", copy));
+          }
+          return clean;
         })
-        .catch(() => caches.match("./index.html").then((cached) => cached || caches.match("./offline.html")))
+        .catch(() =>
+          caches
+            .match("./index.html")
+            .then((cached) => cleanRedirectedResponse(cached))
+            .then((cached) => cached || caches.match("./offline.html").then((fallback) => cleanRedirectedResponse(fallback)))
+        )
     );
     return;
   }
 
   event.respondWith(
-    caches.match(request, { ignoreSearch: true }).then((cached) => {
-      if (cached) return cached;
+    caches.match(request, { ignoreSearch: true }).then(async (cached) => {
+      if (cached) return cleanRedirectedResponse(cached);
       return fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
+        .then(async (response) => {
+          const clean = await cleanRedirectedResponse(response);
+          if (clean.ok) {
+            const copy = clean.clone();
             caches.open(CACHE_VERSION).then((cache) => cache.put(request, copy));
           }
-          return response;
+          return clean;
         })
         .catch(() => new Response("", { status: 504, statusText: "Offline" }));
     })

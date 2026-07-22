@@ -12,6 +12,7 @@ Questa app puo essere ospitata su Cloudflare Pages come sito statico. Supabase g
 6. Per la versione 1.4, esegui anche tutto il contenuto di `supabase/version-1.4.sql`.
 7. Per la versione 1.5, esegui anche tutto il contenuto di `supabase/version-1.5.sql`.
 8. Per la versione 1.6, esegui anche tutto il contenuto di `supabase/version-1.6.sql`.
+9. Per la versione 1.7, esegui anche tutto il contenuto di `supabase/version-1.7.sql`.
 
 Lo schema include:
 
@@ -156,3 +157,13 @@ La versione 1.6 aggiunge:
 - login senza email reali e senza dipendere da `auth.users`;
 - token applicativi per autorizzare sessioni, inviti, personaggi e pannello admin;
 - supporto ai ruoli per-sessione: lo stesso account puo essere master in una sessione e player in un'altra.
+
+## 10. Versione 1.7
+
+La versione 1.7 aggiunge:
+
+- PWA offline-first con Service Worker, Cache Storage e IndexedDB;
+- accesso offline locale esplicito ai dati gia salvati sul dispositivo;
+- coda di sincronizzazione locale con controllo proprietario scheda;
+- persistenza locale multi-profilo senza sovrascrivere ruoli/sessioni nello stesso dispositivo;
+- primary key tecnica `id` su `session_members`, mantenendo gli indici unici esistenti.

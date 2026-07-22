@@ -100,6 +100,8 @@ const defaultState = {
   speed: "9 m",
   deathSuccesses: 0,
   deathFailures: 0,
+  deathSuccessChecks: [],
+  deathFailureChecks: [],
   conditions: [],
   hitDice: "2d8",
   proficiency: 2,
@@ -960,11 +962,15 @@ function renderEquipment() {
 function bindDeathSaves() {
   document.querySelectorAll("[data-death]").forEach((input) => {
     const key = input.dataset.death === "successes" ? "deathSuccesses" : "deathFailures";
-    input.checked = Number(input.value) <= Number(state[key]);
+    const checksKey = input.dataset.death === "successes" ? "deathSuccessChecks" : "deathFailureChecks";
+    const checks = Array.isArray(state[checksKey]) ? state[checksKey].map(String) : [];
+    input.checked = checks.length ? checks.includes(String(input.value)) : Number(input.value) <= Number(state[key]);
     input.addEventListener("change", () => {
-      const checked = [...document.querySelectorAll(`[data-death="${input.dataset.death}"]`)].filter((box) => box.checked).length;
-      state[key] = checked;
-      bindDeathSaves();
+      const checkedValues = [...document.querySelectorAll(`[data-death="${input.dataset.death}"]`)]
+        .filter((box) => box.checked)
+        .map((box) => String(box.value));
+      state[checksKey] = checkedValues;
+      state[key] = checkedValues.length;
       saveState();
     });
   });
