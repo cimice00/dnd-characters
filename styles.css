@@ -149,6 +149,7 @@ button {
 }
 
 .field input,
+.field select,
 .field textarea,
 .number-field input,
 .quick-stat input {
@@ -177,8 +178,13 @@ button {
 }
 
 .field input,
+.field select,
 .field textarea {
   padding: 10px 11px;
+}
+
+.field select {
+  appearance: none;
 }
 
 .field textarea {
@@ -187,6 +193,7 @@ button {
 }
 
 .field input:focus,
+.field select:focus,
 .field textarea:focus,
 .number-field input:focus,
 .quick-stat input:focus {

@@ -93,6 +93,20 @@
         <button class="small-button" id="changeOwnPasswordButton" type="button">Cambia password</button>
         <button class="small-button" id="logoutButton" type="button">Esci</button>
       </section>
+      <section class="list-panel">
+        <div class="section-title">
+          <span>Incantesimi</span>
+          <small>Lingua</small>
+        </div>
+        <label class="field">
+          <span>Database incantesimi</span>
+          <select id="spellLanguageSelect" data-field="spellLanguage">
+            <option value="it">Italiano</option>
+            <option value="en">Inglese</option>
+          </select>
+        </label>
+        <p class="muted-line">La scelta cambia ricerca, schede incantesimo e PDF, mantenendo gli stessi incantesimi selezionati.</p>
+      </section>
       <section class="list-panel" id="masterSessionSettingsPanel" hidden>
         <div class="section-title">
           <span>Sessioni master</span>
@@ -552,6 +566,10 @@
       </section>
     </aside>
 
+    <script src="spells-db.js"></script>
+    <script>
+      window.DND_SPELLS_EN = Array.isArray(window.DND_SPELLS) ? window.DND_SPELLS : [];
+    </script>
     <script src="spells-db-it.js"></script>
     <script src="supabase-config.js"></script>
     <script src="app.js"></script>

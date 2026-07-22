@@ -138,6 +138,7 @@ const defaultState = {
   ],
   cantrips: "Mano Magica\nIllusione Minore",
   spells: "Caduta Morbida\nCharme su Persone",
+  spellLanguage: "it",
   knownSpellIds: [],
   preparedSpellIds: [],
   customSpells: [],
@@ -222,6 +223,9 @@ function mergeState(base, patch) {
   if (!Array.isArray(next.resources)) {
     next.resources = [];
   }
+  if (!["it", "en"].includes(next.spellLanguage)) {
+    next.spellLanguage = "it";
+  }
   return next;
 }
 
@@ -276,6 +280,11 @@ function bindFields() {
       }
       if (key === "classLevel") {
         syncSpellClassFilter(false);
+        renderSpellPicker();
+      }
+      if (key === "spellLanguage") {
+        state.spellLanguage = field.value === "en" ? "en" : "it";
+        populateSpellFilters();
         renderSpellPicker();
       }
     });
@@ -448,8 +457,19 @@ function renderSlots() {
 }
 
 function spellDatabase() {
-  const officialSpells = Array.isArray(window.DND_SPELLS) ? window.DND_SPELLS : [];
+  const officialSpells = officialSpellDatabase();
   return [...officialSpells, ...state.customSpells];
+}
+
+function officialSpellDatabase(language = state.spellLanguage) {
+  const englishSpells = Array.isArray(window.DND_SPELLS_EN)
+    ? window.DND_SPELLS_EN
+    : Array.isArray(window.DND_SPELLS)
+      ? window.DND_SPELLS
+      : [];
+  const italianSpells = Array.isArray(window.DND_SPELLS_IT) ? window.DND_SPELLS_IT : [];
+  if (language === "en") return englishSpells;
+  return italianSpells.length ? italianSpells : englishSpells;
 }
 
 function normalizedText(value) {

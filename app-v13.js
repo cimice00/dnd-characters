@@ -7,7 +7,7 @@
   const SESSION_ID_KEY = "dnd-mobile-session-id-v1";
   const CHARACTER_ID_KEY = "dnd-mobile-character-id-v1";
   const MASTER_PREVIEW_KEY = "dnd-master-character-preview-v1";
-  const APP_VERSION = "1.7.6";
+  const APP_VERSION = "1.7.7";
   const OFFLINE_DB_NAME = "dnd-offline-first-v1";
   const OFFLINE_DB_VERSION = 1;
   const SUPABASE_CDN_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
@@ -1526,7 +1526,7 @@
 
   function appendKnownSpells(lines, state) {
     const customSpells = Array.isArray(state.customSpells) ? state.customSpells : [];
-    const spells = [...(Array.isArray(window.DND_SPELLS) ? window.DND_SPELLS : []), ...customSpells];
+    const spells = [...officialSpellsForState(state), ...customSpells];
     const spellById = new Map(spells.map((spell) => [spell.id, spell]));
     const knownIds = Array.isArray(state.knownSpellIds) ? state.knownSpellIds : [];
     const preparedIds = new Set(Array.isArray(state.preparedSpellIds) ? state.preparedSpellIds : []);
@@ -1557,6 +1557,18 @@
       addPdfLine(lines, "Incantesimi custom locali", 11, 4);
       customSpells.forEach((spell, index) => addPdfWrapped(lines, `${index + 1}. ${spell.name_it || spell.name} - ${spell.level_it || spell.level} - ${spell.source || "Custom"}`));
     }
+  }
+
+  function officialSpellsForState(state) {
+    const language = state?.spellLanguage === "en" ? "en" : "it";
+    const englishSpells = Array.isArray(window.DND_SPELLS_EN)
+      ? window.DND_SPELLS_EN
+      : Array.isArray(window.DND_SPELLS)
+        ? window.DND_SPELLS
+        : [];
+    const italianSpells = Array.isArray(window.DND_SPELLS_IT) ? window.DND_SPELLS_IT : [];
+    if (language === "en") return englishSpells;
+    return italianSpells.length ? italianSpells : englishSpells;
   }
 
   function addPdfSection(lines, title) {
