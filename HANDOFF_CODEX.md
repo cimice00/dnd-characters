@@ -7,8 +7,8 @@ Questo file serve per riprendere il lavoro su un'altra macchina senza perdere co
 - Repository locale: `C:\Users\claudio.giglio\Documents\DnD Characters`
 - Branch attuale al momento dell'handoff: `main`
 - App statica frontend, senza framework.
-- Versione reale del codice: `1.7.5` per la PWA/offline-first.
-- `README.md`, `VERSION`, `manifest.webmanifest`, `manifest.json`, `sw.js` e `app-v13.js` sono allineati a `1.7.5`.
+- Versione reale del codice: `1.7.6` per la PWA/offline-first.
+- `README.md`, `VERSION`, `manifest.webmanifest`, `manifest.json`, `sw.js` e `app-v13.js` sono allineati a `1.7.6`.
 - Le ultime modifiche PWA/offline e banner sync non richiedono migrazioni database.
 
 ## File principali
@@ -17,11 +17,12 @@ Questo file serve per riprendere il lavoro su un'altra macchina senza perdere co
 - `styles.css`: stile globale, pannelli, dashboard master, banner sync, tab e layout mobile.
 - `app.js`: logica scheda personaggio locale: campi, tab, condizioni, risorse, magia, slot, incantesimi.
 - `app-v13.js`: logica applicativa: login, sessioni, Supabase RPC, master dashboard, PDF, PWA/offline, IndexedDB, sync queue.
-- `spells-db.js`: database incantesimi frontend.
+- `spells-db.js`: database incantesimi frontend in inglese.
+- `spells-db-it.js`: database incantesimi frontend in italiano, con stessi id e stesso ordine di `spells-db.js`.
 - `supabase-config.js`: configurazione runtime Supabase. In locale ora e' vuota/placeholder.
 - `scripts/build-config.mjs`: genera `supabase-config.js` da variabili ambiente.
 - `sw.js`: service worker PWA.
-- `manifest.webmanifest`: manifest PWA aggiornato a `1.7.5`.
+- `manifest.webmanifest`: manifest PWA aggiornato a `1.7.6`.
 - `offline.html`: fallback pagina offline.
 - `pwa-icon.svg`: icona PWA.
 - `supabase/`: schema e migrazioni SQL.
@@ -56,7 +57,7 @@ Implementazione attuale:
 
 - `manifest.webmanifest` collegato in `index.html`;
 - service worker in `sw.js`;
-- cache app shell: `index.html`, `styles.css`, `app.js`, `app-v13.js`, `spells-db.js`, `supabase-config.js`, manifest, icona, fallback offline;
+- cache app shell: `index.html`, `styles.css`, `app.js`, `app-v13.js`, `spells-db.js`, `spells-db-it.js`, `supabase-config.js`, manifest, icona, fallback offline;
 - IndexedDB nativo, senza Dexie, per evitare dipendenze CDN offline;
 - database browser: `dnd-offline-first-v1`;
 - store IndexedDB:
@@ -75,7 +76,7 @@ Implementazione attuale:
 
 Fix importante gia applicata:
 
-- `sw.js` e' passato a cache `dnd-pwa-v1.7.5`;
+- `sw.js` e' passato a cache `dnd-pwa-v1.7.6`;
 - `offline.html` viene restituito solo per navigazioni, mai come fallback per `.js` o `.css`;
 - lo script Supabase CDN non e' piu caricato direttamente in `index.html`;
 - `app-v13.js` carica Supabase dinamicamente solo se serve e se c'e' rete.

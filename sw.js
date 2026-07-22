@@ -1,4 +1,4 @@
-const CACHE_VERSION = "dnd-pwa-v1.7.5";
+const CACHE_VERSION = "dnd-pwa-v1.7.6";
 const APP_SHELL = [
   "./index.html",
   "./offline.html",
@@ -6,6 +6,7 @@ const APP_SHELL = [
   "./app.js",
   "./app-v13.js",
   "./spells-db.js",
+  "./spells-db-it.js",
   "./supabase-config.js",
   "./manifest.webmanifest",
   "./pwa-icon.svg"
