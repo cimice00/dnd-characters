@@ -32,18 +32,6 @@
       </section>
     </main>
 
-    <main class="auth-screen emergency-offline-view" id="emergencyOfflineView" hidden>
-      <section class="auth-card emergency-offline-card">
-        <div class="brand-block">
-          <span>Modalita offline</span>
-          <h1>Backup locale</h1>
-        </div>
-        <p class="view-status">La rete non risponde. Ho trovato dati salvati su questo dispositivo.</p>
-        <div class="emergency-sheet-summary" id="emergencySheetSummary"></div>
-        <button class="primary-button" id="offlineOpenFullSheetButton" type="button">Apri scheda locale</button>
-      </section>
-    </main>
-
     <main class="session-screen app-view" id="sessionView" hidden>
       <header class="screen-topbar">
         <div>
@@ -559,69 +547,5 @@
     <script src="supabase-config.js"></script>
     <script src="app.js"></script>
     <script src="app-v13.js"></script>
-    <script>
-      (() => {
-        const STORAGE_KEY = "dnd-mobile-character-v1";
-        function readState() {
-          try {
-            return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-          } catch {
-            return {};
-          }
-        }
-        function escapeHtml(value) {
-          return String(value ?? "")
-            .replaceAll("&", "&amp;")
-            .replaceAll("<", "&lt;")
-            .replaceAll(">", "&gt;");
-        }
-        function listValues(values) {
-          return Array.isArray(values) ? values.filter(Boolean).join(", ") : "";
-        }
-        function resources(values) {
-          return Array.isArray(values)
-            ? values
-                .filter((item) => item?.name)
-                .map((item) => `${item.name}: ${item.current ?? "-"}/${item.max ?? "-"}`)
-                .join(", ")
-            : "";
-        }
-        function showEmergencyOfflineView() {
-          if (window.DND_APP_BOOTED || navigator.onLine) return;
-          const state = readState();
-          const hasSheet = state.activeSessionId || state.name || state.classLevel || state.hpMax;
-          if (!hasSheet) return;
-          document.querySelectorAll(".app-view").forEach((view) => {
-            view.hidden = true;
-          });
-          const summary = document.getElementById("emergencySheetSummary");
-          if (summary) {
-            summary.innerHTML = `
-              <dl>
-                <div><dt>Personaggio</dt><dd>${escapeHtml(state.name || "Personaggio salvato")}</dd></div>
-                <div><dt>Sessione</dt><dd>${escapeHtml(state.session || "Sessione offline")}</dd></div>
-                <div><dt>Classe</dt><dd>${escapeHtml(state.classLevel || "-")}</dd></div>
-                <div><dt>PF</dt><dd>${escapeHtml(`${state.hpCurrent ?? "-"} / ${state.hpMax ?? "-"}`)}</dd></div>
-                <div><dt>Condizioni</dt><dd>${escapeHtml(listValues(state.conditions) || "-")}</dd></div>
-                <div><dt>Risorse</dt><dd>${escapeHtml(resources(state.resources) || "-")}</dd></div>
-              </dl>
-            `;
-          }
-          const emergency = document.getElementById("emergencyOfflineView");
-          if (emergency) emergency.hidden = false;
-        }
-        document.getElementById("offlineOpenFullSheetButton")?.addEventListener("click", () => {
-          document.getElementById("emergencyOfflineView").hidden = true;
-          document.querySelectorAll(".app-view").forEach((view) => {
-            view.hidden = true;
-          });
-          const character = document.getElementById("characterView");
-          if (character) character.hidden = false;
-        });
-        window.addEventListener("load", () => window.setTimeout(showEmergencyOfflineView, 1800));
-        window.addEventListener("offline", () => window.setTimeout(showEmergencyOfflineView, 800));
-        window.setTimeout(showEmergencyOfflineView, 3500);
-      })();
-    </script>
   </body>
 </html>

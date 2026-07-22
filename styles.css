@@ -1132,51 +1132,6 @@ summary {
   padding: 18px;
 }
 
-.emergency-offline-view {
-  position: fixed;
-  inset: 0;
-  z-index: 120;
-  background: var(--bg);
-}
-
-.emergency-offline-card {
-  align-self: center;
-}
-
-.emergency-sheet-summary {
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-.emergency-sheet-summary dl {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-}
-
-.emergency-sheet-summary div {
-  display: grid;
-  grid-template-columns: 98px 1fr;
-  gap: 10px;
-  min-width: 0;
-}
-
-.emergency-sheet-summary dt {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.emergency-sheet-summary dd {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-weight: 800;
-}
-
 .brand-block {
   display: grid;
   gap: 4px;
