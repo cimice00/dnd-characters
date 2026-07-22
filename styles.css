@@ -1492,7 +1492,18 @@ summary {
 }
 
 .topbar {
-  grid-template-columns: 44px 1fr;
+  grid-template-columns: minmax(0, 1fr) 44px;
+}
+
+.topbar .session-title {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+#menuButton {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
 }
 
 .sync-banner {
