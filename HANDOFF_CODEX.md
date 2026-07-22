@@ -7,8 +7,8 @@ Questo file serve per riprendere il lavoro su un'altra macchina senza perdere co
 - Repository locale: `C:\Users\claudio.giglio\Documents\DnD Characters`
 - Branch attuale al momento dell'handoff: `main`
 - App statica frontend, senza framework.
-- Versione reale del codice: `1.7.9` per la PWA/offline-first.
-- `README.md`, `VERSION`, `manifest.webmanifest`, `manifest.json`, `sw.js` e `app-v13.js` sono allineati a `1.7.9`.
+- Versione reale del codice: `1.7.10` per la PWA/offline-first.
+- `README.md`, `VERSION`, `manifest.webmanifest`, `manifest.json`, `sw.js` e `app-v13.js` sono allineati a `1.7.10`.
 - Le ultime modifiche PWA/offline e banner sync non richiedono migrazioni database.
 
 ## File principali
@@ -22,10 +22,11 @@ Questo file serve per riprendere il lavoro su un'altra macchina senza perdere co
 - La lingua del database incantesimi si sceglie da Impostazioni; la preferenza viene salvata nella scheda come `spellLanguage`.
 - La versione `1.7.8` normalizza lato frontend sessioni, inviti e schede master per evitare doppioni visivi temporanei se server/cache restituiscono righe duplicate.
 - La versione `1.7.9` rifinisce la UI della scheda: banner sync nascondibile dal menu, Classe/Livello separati, PF/stat/caratteristiche allineati e TS morte progressivi.
+- La versione `1.7.10` nasconde le frecce native degli input numerici per mantenere valori e label centrati senza cambiare il tipo `number`.
 - `supabase-config.js`: configurazione runtime Supabase. In locale ora e' vuota/placeholder.
 - `scripts/build-config.mjs`: genera `supabase-config.js` da variabili ambiente.
 - `sw.js`: service worker PWA.
-- `manifest.webmanifest`: manifest PWA aggiornato a `1.7.9`.
+- `manifest.webmanifest`: manifest PWA aggiornato a `1.7.10`.
 - `offline.html`: fallback pagina offline.
 - `pwa-icon.svg`: icona PWA.
 - `supabase/`: schema e migrazioni SQL.
@@ -79,7 +80,7 @@ Implementazione attuale:
 
 Fix importante gia applicata:
 
-- `sw.js` e' passato a cache `dnd-pwa-v1.7.9`;
+- `sw.js` e' passato a cache `dnd-pwa-v1.7.10`;
 - `offline.html` viene restituito solo per navigazioni, mai come fallback per `.js` o `.css`;
 - lo script Supabase CDN non e' piu caricato direttamente in `index.html`;
 - `app-v13.js` carica Supabase dinamicamente solo se serve e se c'e' rete.

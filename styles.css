@@ -183,6 +183,30 @@ button {
   padding: 10px 11px;
 }
 
+.field input[type="number"],
+.number-field input[type="number"],
+.quick-stat input[type="number"],
+.ability-card input[type="number"],
+.passive-field input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.field input[type="number"]::-webkit-inner-spin-button,
+.field input[type="number"]::-webkit-outer-spin-button,
+.number-field input[type="number"]::-webkit-inner-spin-button,
+.number-field input[type="number"]::-webkit-outer-spin-button,
+.quick-stat input[type="number"]::-webkit-inner-spin-button,
+.quick-stat input[type="number"]::-webkit-outer-spin-button,
+.ability-card input[type="number"]::-webkit-inner-spin-button,
+.ability-card input[type="number"]::-webkit-outer-spin-button,
+.passive-field input[type="number"]::-webkit-inner-spin-button,
+.passive-field input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
 .field select {
   appearance: none;
 }
