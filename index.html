@@ -227,8 +227,12 @@
             <input data-field="race" type="text" autocomplete="off" />
           </label>
           <label class="field">
-            <span>Classe & livello</span>
-            <input data-field="classLevel" type="text" autocomplete="off" />
+            <span>Classe</span>
+            <input id="characterClassInput" type="text" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Livello</span>
+            <input id="characterLevelInput" type="number" inputmode="numeric" min="1" />
           </label>
         </div>
       </section>
@@ -237,13 +241,11 @@
         <article class="hp-panel">
           <div class="section-title">
             <span>Punti Ferita</span>
-            <small>attuali / massimi / temporanei</small>
           </div>
           <div class="hp-row">
             <button class="step-button" data-action="hp-minus" type="button" aria-label="Riduci punti ferita" title="Riduci punti ferita">−</button>
             <label class="number-field hp-now">
-              <span>PF</span>
-              <input data-field="hpCurrent" type="number" inputmode="numeric" />
+              <input data-field="hpCurrent" type="number" inputmode="numeric" aria-label="Punti ferita attuali" />
             </label>
             <button class="step-button" data-action="hp-plus" type="button" aria-label="Aumenta punti ferita" title="Aumenta punti ferita">+</button>
           </div>
@@ -307,7 +309,6 @@
       <section class="ability-band" aria-label="Caratteristiche">
         <div class="section-title">
           <span>Caratteristiche</span>
-          <small>modificatore in evidenza</small>
         </div>
         <div class="ability-grid" id="abilityGrid"></div>
       </section>
@@ -547,6 +548,7 @@
         <button class="drawer-nav-button" data-nav-target="sessions" type="button">Sessioni</button>
         <button class="drawer-nav-button" id="prepareOfflineButton" type="button" hidden>Prepara sessione offline</button>
         <button class="drawer-nav-button" id="exportCharacterPdfButton" type="button" hidden>Scarica PDF scheda</button>
+        <button class="drawer-nav-button" id="toggleSyncBannerButton" type="button" hidden>Nascondi stato scheda</button>
         <button class="drawer-nav-button" data-nav-target="settings" type="button">Impostazioni</button>
         <button class="drawer-nav-button" data-nav-target="admin" id="adminNavButton" type="button" hidden>Amministrazione</button>
       </section>

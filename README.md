@@ -2,7 +2,7 @@
 
 Primo prototipo mobile della schermata personaggio.
 
-Versione app: `1.7.8`
+Versione app: `1.7.9`
 
 Apri `index.html` nel browser per provarlo. I dati vengono salvati automaticamente nel browser del dispositivo.
 

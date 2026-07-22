@@ -291,6 +291,43 @@ function bindFields() {
   });
 }
 
+function splitClassLevel(value) {
+  const text = String(value || "").trim();
+  const match = text.match(/^(.*?)(?:\s+(\d+))?$/);
+  return {
+    className: (match?.[1] || "").trim(),
+    level: match?.[2] || "",
+  };
+}
+
+function combineClassLevel(className, level) {
+  return [String(className || "").trim(), String(level || "").trim()].filter(Boolean).join(" ");
+}
+
+function syncClassLevelControls() {
+  const classInput = document.getElementById("characterClassInput");
+  const levelInput = document.getElementById("characterLevelInput");
+  if (!classInput || !levelInput) return;
+  const split = splitClassLevel(state.classLevel);
+  classInput.value = split.className;
+  levelInput.value = split.level;
+}
+
+function bindClassLevelControls() {
+  const classInput = document.getElementById("characterClassInput");
+  const levelInput = document.getElementById("characterLevelInput");
+  if (!classInput || !levelInput) return;
+  syncClassLevelControls();
+  [classInput, levelInput].forEach((input) => {
+    input.addEventListener("input", () => {
+      state.classLevel = combineClassLevel(classInput.value, levelInput.value);
+      saveState();
+      syncSpellClassFilter(false);
+      renderSpellPicker();
+    });
+  });
+}
+
 function clampHitPoints() {
   const max = Math.max(0, Number(state.hpMax) || 0);
   state.hpMax = max;
@@ -980,19 +1017,34 @@ function renderEquipment() {
 }
 
 function bindDeathSaves() {
+  ["successes", "failures"].forEach((type) => syncDeathTrack(type));
   document.querySelectorAll("[data-death]").forEach((input) => {
-    const key = input.dataset.death === "successes" ? "deathSuccesses" : "deathFailures";
-    const checksKey = input.dataset.death === "successes" ? "deathSuccessChecks" : "deathFailureChecks";
-    const checks = Array.isArray(state[checksKey]) ? state[checksKey].map(String) : [];
-    input.checked = checks.length ? checks.includes(String(input.value)) : Number(input.value) <= Number(state[key]);
     input.addEventListener("change", () => {
-      const checkedValues = [...document.querySelectorAll(`[data-death="${input.dataset.death}"]`)]
-        .filter((box) => box.checked)
-        .map((box) => String(box.value));
-      state[checksKey] = checkedValues;
-      state[key] = checkedValues.length;
+      const type = input.dataset.death;
+      const value = Number(input.value) || 0;
+      const count = input.checked ? value : Math.max(0, value - 1);
+      updateDeathTrack(type, count);
       saveState();
     });
+  });
+}
+
+function syncDeathTrack(type) {
+  const key = type === "successes" ? "deathSuccesses" : "deathFailures";
+  const checksKey = type === "successes" ? "deathSuccessChecks" : "deathFailureChecks";
+  const checks = Array.isArray(state[checksKey]) ? state[checksKey].map(Number).filter(Boolean) : [];
+  const count = Math.max(0, Math.min(3, checks.length ? Math.max(...checks) : Number(state[key]) || 0));
+  updateDeathTrack(type, count);
+}
+
+function updateDeathTrack(type, count) {
+  const key = type === "successes" ? "deathSuccesses" : "deathFailures";
+  const checksKey = type === "successes" ? "deathSuccessChecks" : "deathFailureChecks";
+  const safeCount = Math.max(0, Math.min(3, Number(count) || 0));
+  state[key] = safeCount;
+  state[checksKey] = Array.from({ length: safeCount }, (_, index) => String(index + 1));
+  document.querySelectorAll(`[data-death="${type}"]`).forEach((box) => {
+    box.checked = Number(box.value) <= safeCount;
   });
 }
 
@@ -1058,6 +1110,7 @@ function init() {
   applyTheme(localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark");
   clampHitPoints();
   bindFields();
+  bindClassLevelControls();
   renderAbilities();
   renderChecks();
   renderAttacks();

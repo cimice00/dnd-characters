@@ -7,7 +7,8 @@
   const SESSION_ID_KEY = "dnd-mobile-session-id-v1";
   const CHARACTER_ID_KEY = "dnd-mobile-character-id-v1";
   const MASTER_PREVIEW_KEY = "dnd-master-character-preview-v1";
-  const APP_VERSION = "1.7.8";
+  const SYNC_BANNER_PREF_KEY = "dnd-character-sync-banner-v1";
+  const APP_VERSION = "1.7.9";
   const OFFLINE_DB_NAME = "dnd-offline-first-v1";
   const OFFLINE_DB_VERSION = 1;
   const SUPABASE_CDN_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
@@ -159,9 +160,36 @@
   function setCharacterSyncBanner(state, detail) {
     const banner = $("#characterSyncBanner");
     if (!banner) return;
-    banner.hidden = !state && !detail;
+    const hasContent = Boolean(state || detail);
+    banner.classList.toggle("user-hidden", hasContent && !isCharacterSyncBannerVisible());
+    banner.hidden = !hasContent || !isCharacterSyncBannerVisible();
     if (state) setText("#characterSyncState", state);
     if (detail) setText("#characterSyncDetail", detail);
+    updateSyncBannerMenuButton();
+  }
+
+  function isCharacterSyncBannerVisible() {
+    return localStorage.getItem(SYNC_BANNER_PREF_KEY) !== "hidden";
+  }
+
+  function updateSyncBannerMenuButton() {
+    const button = $("#toggleSyncBannerButton");
+    if (!button) return;
+    button.hidden = !selectedCharacterId();
+    button.textContent = isCharacterSyncBannerVisible() ? "Nascondi stato scheda" : "Mostra stato scheda";
+  }
+
+  function toggleCharacterSyncBanner() {
+    const nextHidden = isCharacterSyncBannerVisible();
+    if (nextHidden) {
+      localStorage.setItem(SYNC_BANNER_PREF_KEY, "hidden");
+    } else {
+      localStorage.removeItem(SYNC_BANNER_PREF_KEY);
+    }
+    const banner = $("#characterSyncBanner");
+    const state = $("#characterSyncState")?.textContent || "";
+    const detail = $("#characterSyncDetail")?.textContent || "";
+    if (banner) setCharacterSyncBanner(state, detail);
   }
 
   function registerServiceWorker() {
@@ -958,6 +986,7 @@
     if (exportButton) exportButton.hidden = !selectedCharacterId();
     const prepareButton = $("#prepareOfflineButton");
     if (prepareButton) prepareButton.hidden = !app.currentSession;
+    updateSyncBannerMenuButton();
     renderSettingsMasterSessions();
   }
 
@@ -2252,6 +2281,7 @@
     $("#logoutButton").addEventListener("click", signOut);
     $("#changeOwnPasswordButton").addEventListener("click", changeOwnPassword);
     $("#exportCharacterPdfButton").addEventListener("click", exportCurrentCharacterPdf);
+    $("#toggleSyncBannerButton")?.addEventListener("click", toggleCharacterSyncBanner);
     $("#exportSessionPdfButton").addEventListener("click", exportMasterSessionPdf);
     $("#prepareOfflineButton").addEventListener("click", prepareOfflineSession);
     $("#prepareOfflineMasterButton").addEventListener("click", prepareOfflineSession);

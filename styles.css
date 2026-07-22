@@ -247,6 +247,10 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.hero-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 82px;
+}
+
 .combat-core,
 .ability-band,
 .attacks-panel,
@@ -308,6 +312,11 @@ button {
   min-width: 0;
 }
 
+.number-field span,
+.quick-stat span {
+  text-align: center;
+}
+
 .number-field input,
 .quick-stat input {
   height: 42px;
@@ -317,7 +326,7 @@ button {
 }
 
 .hp-now input {
-  height: 58px;
+  height: 76px;
   color: var(--gold);
   font-size: 30px;
 }
@@ -340,6 +349,7 @@ button {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
+  text-align: center;
 }
 
 .quick-stat input {
@@ -356,14 +366,15 @@ button {
 
 .death-track {
   display: grid;
-  grid-template-columns: 82px repeat(3, 1fr);
+  grid-template-columns: 82px repeat(3, minmax(0, 1fr));
   gap: 8px;
   align-items: center;
 }
 
 .death-track label {
   position: relative;
-  height: 34px;
+  height: 38px;
+  cursor: pointer;
 }
 
 .death-track input {
@@ -373,12 +384,25 @@ button {
 }
 
 .death-track i {
-  display: block;
+  display: grid;
+  place-items: center;
   width: 100%;
   height: 100%;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface-2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+
+.death-track i::after {
+  color: #fff;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1;
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 0.16s ease, transform 0.16s ease;
 }
 
 .death-track input:checked + i {
@@ -386,9 +410,19 @@ button {
   background: linear-gradient(135deg, var(--green), #2f6847);
 }
 
+.death-track input:checked + i::after {
+  content: "✓";
+  opacity: 1;
+  transform: scale(1);
+}
+
 .death-track.fail input:checked + i {
   border-color: var(--red);
   background: linear-gradient(135deg, var(--red), #6e2724);
+}
+
+.death-track.fail input:checked + i::after {
+  content: "×";
 }
 
 .ability-grid {
@@ -401,6 +435,7 @@ button {
 .ability-card {
   display: grid;
   gap: 7px;
+  place-items: center;
   min-width: 0;
   padding: 10px 8px;
   border: 1px solid var(--line);
@@ -412,6 +447,7 @@ button {
 .ability-card label {
   display: grid;
   gap: 5px;
+  width: 100%;
 }
 
 .ability-card span {
@@ -532,6 +568,7 @@ button {
 .toggle-field,
 .passive-field {
   display: grid;
+  justify-items: center;
   align-items: center;
   gap: 8px;
   min-height: 58px;
@@ -556,6 +593,7 @@ button {
   color: var(--muted);
   font-size: 11px;
   font-weight: 800;
+  text-align: center;
   text-transform: uppercase;
 }
 
@@ -1532,6 +1570,10 @@ summary {
   visibility: hidden;
 }
 
+.sync-banner.user-hidden {
+  display: none !important;
+}
+
 .sync-banner span {
   overflow: hidden;
   color: var(--muted);
@@ -1714,6 +1756,14 @@ summary {
 @media (max-width: 380px) {
   .hero-name input {
     font-size: 24px;
+  }
+
+  .hero-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hero-grid .field:first-child {
+    grid-column: 1 / -1;
   }
 
   .attack-row {
