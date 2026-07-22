@@ -1,6 +1,7 @@
 (() => {
   const STORAGE_KEY = "dnd-mobile-character-v1";
   const APP_TOKEN_KEY = "dnd-app-account-token-v1";
+  const OFFLINE_PROFILE_ID_KEY = "dnd-offline-profile-id-v1";
   const SESSION_ID_KEY = "dnd-mobile-session-id-v1";
   const CHARACTER_ID_KEY = "dnd-mobile-character-id-v1";
   const MASTER_PREVIEW_KEY = "dnd-master-character-preview-v1";
@@ -76,6 +77,7 @@
     saveTimer: null,
     db: null,
     offlineReady: false,
+    offlineAccessOptions: [],
     isOnline: navigator.onLine,
     syncTimer: null,
     config: window.DND_APP_CONFIG || {},
@@ -244,7 +246,12 @@
 
   async function loadCachedShell() {
     const profiles = await idbGetAll("local_profiles").catch(() => []);
-    const profile = profiles.find((item) => item.token === app.sessionToken) || profiles[0] || null;
+    const offlineProfileId = localStorage.getItem(OFFLINE_PROFILE_ID_KEY) || "";
+    const profile =
+      profiles.find((item) => offlineProfileId && item.id === offlineProfileId) ||
+      profiles.find((item) => item.token === app.sessionToken) ||
+      profiles[0] ||
+      null;
     if (!profile) return null;
     const sessions = (await idbGetAll("local_sessions").catch(() => []))
       .filter((item) => !item.profile_id || item.profile_id === profile.id)
@@ -285,7 +292,7 @@
   async function findLocalCharacter(sessionId, characterId = selectedCharacterId(), ownerId = app.user?.id) {
     if (characterId) {
       const exact = await idbGet("local_characters", characterId).catch(() => null);
-      if (exact) return exact;
+      if (exact && (!ownerId || !exact.owner_id || exact.owner_id === ownerId)) return exact;
     }
     const all = await idbGetAll("local_characters").catch(() => []);
     return (
@@ -302,6 +309,11 @@
     const now = new Date().toISOString();
     const state = { ...getState(), activeSessionId: sessionId, session: app.currentSession?.name || getState().session, appVersion: APP_VERSION };
     const previous = await idbGet("local_characters", characterId).catch(() => null);
+    if (previous?.owner_id && previous.owner_id !== app.user.id) {
+      setCharacterSyncBanner("Non sincronizzata", "Questa scheda appartiene a un altro utente locale.");
+      setStatus("Scheda di un altro utente: salvataggio non accodato");
+      return null;
+    }
     const record = {
       ...(previous || {}),
       id: characterId,
@@ -330,6 +342,7 @@
       type: "character_upsert",
       character_id: record.id,
       session_id: record.session_id,
+      owner_id: record.owner_id,
       payload: record.data,
       status: "pending",
       attempts: 0,
@@ -342,8 +355,15 @@
     const queue = await idbGetAll("sync_queue").catch(() => []);
     const pending = queue.filter((item) => item.status !== "synced");
     if (!pending.length) return { ok: true, message: "Nessuna modifica in coda" };
+    let skippedForOwner = 0;
     for (const item of pending) {
       if (item.type !== "character_upsert") continue;
+      const record = await idbGet("local_characters", item.character_id).catch(() => null);
+      const ownerId = item.owner_id || record?.owner_id || "";
+      if (!ownerId || ownerId !== app.user.id) {
+        skippedForOwner += 1;
+        continue;
+      }
       let error = null;
       try {
         const response = await app.client.rpc("app_update_character", {
@@ -364,12 +384,14 @@
         await idbPut("sync_queue", { ...item, status: "error", attempts: Number(item.attempts) + 1, updated_at: new Date().toISOString() });
         return { ok: false, message: "Scheda salvata, incantesimi custom in coda" };
       }
-      const record = await idbGet("local_characters", item.character_id).catch(() => null);
       if (record) {
         const syncedAt = new Date().toISOString();
         await idbPut("local_characters", { ...record, sync_status: "synced", last_successful_sync_at: syncedAt, server_updated_at: syncedAt });
       }
       await idbDelete("sync_queue", item.id);
+    }
+    if (skippedForOwner) {
+      return { ok: false, message: "Alcune modifiche appartengono a un altro utente e restano locali" };
     }
     setCharacterSyncBanner("Sincronizzata", "Le modifiche locali sono arrivate al database.");
     return { ok: true, message: "Sincronizzato con Supabase" };
@@ -378,6 +400,128 @@
   function scheduleSyncQueue(delay = 1000) {
     window.clearTimeout(app.syncTimer);
     app.syncTimer = window.setTimeout(() => syncPendingQueue().catch(() => null), delay);
+  }
+
+  async function buildOfflineAccessOptions() {
+    const profiles = await idbGetAll("local_profiles").catch(() => []);
+    const sessions = await idbGetAll("local_sessions").catch(() => []);
+    const characters = await idbGetAll("local_characters").catch(() => []);
+    const sessionsById = new Map(sessions.map((item) => [item.id, item]));
+    return profiles
+      .map((profile) => {
+        const sheets = characters
+          .filter((character) => character.owner_id === profile.id)
+          .map((character) => {
+            const sessionRecord = sessionsById.get(character.session_id);
+            const role = sessionRecord?.role || "player";
+            return {
+              character,
+              sessionRecord,
+              role,
+              session: sessionRecord?.session || {
+                id: character.session_id,
+                name: character.data?.session || "Sessione offline",
+              },
+            };
+          })
+          .filter((item) => item.role !== "master");
+        return { profile, sheets };
+      })
+      .filter((option) => option.sheets.length);
+  }
+
+  async function showOfflineLocalAccess() {
+    const panel = $("#offlineAccessPanel");
+    const userList = $("#offlineAccessUsers");
+    const sheetList = $("#offlineAccessSheets");
+    if (!panel || !userList || !sheetList) return;
+    panel.hidden = false;
+    sheetList.hidden = true;
+    setText("#offlineAccessCount", "Cerco");
+    userList.innerHTML = `<div class="empty-state">Cerco dati locali...</div>`;
+    sheetList.innerHTML = "";
+
+    app.offlineAccessOptions = await buildOfflineAccessOptions();
+    setText("#offlineAccessCount", String(app.offlineAccessOptions.length));
+    if (!app.offlineAccessOptions.length) {
+      userList.innerHTML = `<div class="empty-state">Nessuna scheda player trovata su questo dispositivo.</div>`;
+      setText("#loginStatus", "Apri online una sessione almeno una volta prima di usarla offline.");
+      return;
+    }
+
+    userList.innerHTML = app.offlineAccessOptions
+      .map(
+        ({ profile, sheets }) => `
+          <button class="offline-choice-button" data-offline-profile="${escapeAttribute(profile.id)}" type="button">
+            <strong>${escapeHtml(profileName(profile))}</strong>
+            <small>${sheets.length} schede disponibili</small>
+          </button>
+        `
+      )
+      .join("");
+    userList.querySelectorAll("[data-offline-profile]").forEach((button) => {
+      button.addEventListener("click", () => renderOfflineSheets(button.dataset.offlineProfile));
+    });
+    setText("#loginStatus", "Scegli un utente salvato su questo dispositivo.");
+  }
+
+  function renderOfflineSheets(profileId) {
+    const sheetList = $("#offlineAccessSheets");
+    if (!sheetList) return;
+    const option = app.offlineAccessOptions.find((item) => item.profile.id === profileId);
+    if (!option) return;
+    sheetList.hidden = false;
+    sheetList.innerHTML = option.sheets
+      .map(({ character, session }) => {
+        const data = character.data || {};
+        const pending = character.sync_status && character.sync_status !== "synced";
+        return `
+          <button class="offline-choice-button" data-offline-character="${escapeAttribute(character.id)}" data-offline-profile-id="${escapeAttribute(profileId)}" type="button">
+            <strong>${escapeHtml(data.name || character.name || "Personaggio senza nome")}</strong>
+            <span>${escapeHtml(session.name || "Sessione offline")}</span>
+            <small>${pending ? "Modifiche locali" : "Sincronizzata"} - ${escapeHtml(data.classLevel || "Classe non indicata")}</small>
+          </button>
+        `;
+      })
+      .join("");
+    sheetList.querySelectorAll("[data-offline-character]").forEach((button) => {
+      button.addEventListener("click", () => openOfflineLocalCharacter(button.dataset.offlineProfileId, button.dataset.offlineCharacter));
+    });
+    setText("#loginStatus", "Scegli la scheda da aprire offline.");
+  }
+
+  async function openOfflineLocalCharacter(profileId, characterId) {
+    const option = app.offlineAccessOptions.find((item) => item.profile.id === profileId);
+    const sheet = option?.sheets.find((item) => item.character.id === characterId);
+    if (!option || !sheet) {
+      setText("#loginStatus", "Scheda offline non trovata.");
+      return;
+    }
+    const token = option.profile.token || "";
+    if (!token) {
+      setText("#loginStatus", "Profilo locale incompleto: accedi online almeno una volta.");
+      return;
+    }
+    const state = {
+      ...(sheet.character.data || {}),
+      activeSessionId: sheet.session.id,
+      session: sheet.session.name || "Sessione offline",
+      appVersion: APP_VERSION,
+    };
+    app.sessionToken = token;
+    app.user = option.profile;
+    app.profile = option.profile;
+    app.currentSession = sheet.session;
+    app.currentRole = "player";
+    app.sessions = option.sheets.map((item) => ({ role: "player", session: item.session }));
+    localStorage.setItem(APP_TOKEN_KEY, token);
+    localStorage.setItem(OFFLINE_PROFILE_ID_KEY, profileId);
+    localStorage.setItem(SESSION_ID_KEY, sheet.session.id);
+    localStorage.setItem(CHARACTER_ID_KEY, sheet.character.id);
+    localStorage.removeItem(MASTER_PREVIEW_KEY);
+    setState(state);
+    setText("#loginStatus", "Apro scheda offline...");
+    window.location.reload();
   }
 
   function profileName(profile = app.profile) {
@@ -1023,6 +1167,13 @@
     }
     const state = { ...getState(), activeSessionId: sessionId, appVersion: APP_VERSION };
     await saveLocalCharacterSnapshot("pending").catch(() => null);
+    const localRecord = await idbGet("local_characters", characterId).catch(() => null);
+    if (localRecord?.owner_id && localRecord.owner_id !== app.user.id) {
+      const message = "Scheda di un altro utente: sincronizzazione bloccata";
+      if (!silent) setStatus(message);
+      setCharacterSyncBanner("Non sincronizzata", "Accedi con l'utente proprietario per sincronizzare questa scheda.");
+      return { ok: false, message };
+    }
     if (!app.client || !navigator.onLine) {
       if (!silent) setStatus("Salvato offline");
       return { ok: false, message: "Salvato offline: sincronizzazione in coda" };
@@ -1925,6 +2076,7 @@
     }
     app.sessionToken = data.token;
     localStorage.setItem(APP_TOKEN_KEY, app.sessionToken);
+    localStorage.removeItem(OFFLINE_PROFILE_ID_KEY);
     app.user = data.profile;
     app.profile = data.profile;
     $("#loginPassword").value = "";
@@ -1943,6 +2095,7 @@
     app.currentRole = "";
     app.masterCharacters = [];
     localStorage.removeItem(APP_TOKEN_KEY);
+    localStorage.removeItem(OFFLINE_PROFILE_ID_KEY);
     localStorage.removeItem(SESSION_ID_KEY);
     localStorage.removeItem(CHARACTER_ID_KEY);
     localStorage.removeItem(MASTER_PREVIEW_KEY);
@@ -1952,6 +2105,7 @@
 
   function bindEvents() {
     $("#loginSubmit").addEventListener("click", signIn);
+    $("#offlineLocalAccessButton").addEventListener("click", showOfflineLocalAccess);
     $("#loginPassword").addEventListener("keydown", (event) => {
       if (event.key === "Enter") signIn();
     });

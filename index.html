@@ -28,6 +28,15 @@
           <input id="loginPassword" type="password" autocomplete="current-password" />
         </label>
         <button class="primary-button" id="loginSubmit" type="button">Entra</button>
+        <button class="small-button offline-access-button" id="offlineLocalAccessButton" type="button">Accedi offline ai dati sul dispositivo</button>
+        <section class="offline-access-panel" id="offlineAccessPanel" hidden>
+          <div class="section-title">
+            <span>Accesso offline</span>
+            <small id="offlineAccessCount">Locale</small>
+          </div>
+          <div class="offline-choice-list" id="offlineAccessUsers"></div>
+          <div class="offline-choice-list" id="offlineAccessSheets" hidden></div>
+        </section>
         <p class="view-status" id="loginStatus">Accedi per scegliere una sessione.</p>
       </section>
     </main>

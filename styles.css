@@ -1165,6 +1165,56 @@ summary {
   font-weight: 900;
 }
 
+.offline-access-button {
+  width: 100%;
+  min-height: 42px;
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.offline-access-panel {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.offline-choice-list {
+  display: grid;
+  gap: 8px;
+}
+
+.offline-choice-button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  min-height: 48px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--field-bg);
+  color: var(--text);
+  text-align: left;
+}
+
+.offline-choice-button strong,
+.offline-choice-button span,
+.offline-choice-button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.offline-choice-button small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .view-status {
   min-height: 20px;
   margin: 0;
