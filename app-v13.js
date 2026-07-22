@@ -7,7 +7,7 @@
   const SESSION_ID_KEY = "dnd-mobile-session-id-v1";
   const CHARACTER_ID_KEY = "dnd-mobile-character-id-v1";
   const MASTER_PREVIEW_KEY = "dnd-master-character-preview-v1";
-  const APP_VERSION = "1.7.7";
+  const APP_VERSION = "1.7.8";
   const OFFLINE_DB_NAME = "dnd-offline-first-v1";
   const OFFLINE_DB_VERSION = 1;
   const SUPABASE_CDN_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
@@ -277,7 +277,7 @@
     if (shellData.profile?.id) {
       await idbPut("local_profiles", { ...shellData.profile, cached_at: now, token: app.sessionToken });
     }
-    const sessions = Array.isArray(shellData.sessions) ? shellData.sessions : [];
+    const sessions = normalizeSessionMemberships(shellData.sessions);
     await Promise.all(
       sessions
         .filter((member) => member?.session?.id)
@@ -306,7 +306,44 @@
     const sessions = (await idbGetAll("local_sessions").catch(() => []))
       .filter((item) => localSessionMatches(item, profile.id, realSessionId(item)))
       .map((item) => ({ role: item.role, session: item.session }));
-    return { profile, sessions, invites: [] };
+    return { profile, sessions: normalizeSessionMemberships(sessions), invites: [] };
+  }
+
+  function normalizeSessionMemberships(sessions = []) {
+    const bySession = new Map();
+    (Array.isArray(sessions) ? sessions : []).forEach((member) => {
+      const sessionId = member?.session?.id;
+      if (!sessionId) return;
+      const normalized = {
+        ...member,
+        role: member.role === "master" ? "master" : "player",
+      };
+      const existing = bySession.get(sessionId);
+      if (!existing || (existing.role !== "master" && normalized.role === "master")) {
+        bySession.set(sessionId, normalized);
+      }
+    });
+    return [...bySession.values()];
+  }
+
+  function normalizeInvites(invites = []) {
+    const byInvite = new Map();
+    (Array.isArray(invites) ? invites : []).forEach((invite) => {
+      if (invite?.id && !byInvite.has(invite.id)) byInvite.set(invite.id, invite);
+    });
+    return [...byInvite.values()];
+  }
+
+  function normalizeCharacters(characters = []) {
+    const byCharacter = new Map();
+    (Array.isArray(characters) ? characters : []).forEach((character) => {
+      if (!character?.id) return;
+      const existing = byCharacter.get(character.id);
+      const existingUpdated = existing?.updated_at || existing?.local_updated_at || "";
+      const nextUpdated = character.updated_at || character.local_updated_at || "";
+      if (!existing || nextUpdated >= existingUpdated) byCharacter.set(character.id, character);
+    });
+    return [...byCharacter.values()];
   }
 
   function normalizeLocalCharacter(character, sessionId = "", ownerId = "") {
@@ -594,7 +631,7 @@
     app.profile = option.profile;
     app.currentSession = sheet.session;
     app.currentRole = "player";
-    app.sessions = option.sheets.map((item) => ({ role: "player", session: item.session }));
+    app.sessions = normalizeSessionMemberships(option.sheets.map((item) => ({ role: "player", session: item.session })));
     sessionStorage.setItem(OFFLINE_ACCESS_ACTIVE_KEY, "1");
     sessionStorage.setItem(OFFLINE_ACCESS_RELOAD_KEY, "1");
     sessionStorage.setItem(APP_TOKEN_KEY, token);
@@ -857,6 +894,7 @@
     const list = $("#sessionList");
     const count = $("#sessionCount");
     if (!list || !count) return;
+    app.sessions = normalizeSessionMemberships(app.sessions);
     count.textContent = String(app.sessions.length);
     list.innerHTML = app.sessions.length
       ? app.sessions
@@ -927,7 +965,7 @@
     const panel = $("#masterSessionSettingsPanel");
     const list = $("#masterSessionSettingsList");
     if (!panel || !list) return;
-    const masterSessions = app.sessions.filter((item) => item.role === "master" && item.session);
+    const masterSessions = normalizeSessionMemberships(app.sessions).filter((item) => item.role === "master" && item.session);
     panel.hidden = !masterSessions.length;
     list.innerHTML = masterSessions.length
       ? masterSessions
@@ -956,7 +994,7 @@
       if (!cached?.profile) throw new Error("Sessione offline non disponibile");
       app.profile = cached.profile;
       app.user = cached.profile;
-      app.sessions = cached.sessions || [];
+      app.sessions = normalizeSessionMemberships(cached.sessions);
       app.invites = [];
       applyThemePalette(app.profile?.theme_palette || DEFAULT_THEME_PALETTE);
       setStatus("Modalita offline: dati locali");
@@ -976,7 +1014,7 @@
       if (cached?.profile) {
         app.profile = cached.profile;
         app.user = cached.profile;
-        app.sessions = cached.sessions || [];
+        app.sessions = normalizeSessionMemberships(cached.sessions);
         app.invites = [];
         applyThemePalette(app.profile?.theme_palette || DEFAULT_THEME_PALETTE);
         setStatus("Supabase non risponde: uso dati offline");
@@ -992,8 +1030,8 @@
     }
     app.profile = data.profile;
     app.user = data.profile;
-    app.sessions = data.sessions || [];
-    app.invites = data.invites || [];
+    app.sessions = normalizeSessionMemberships(data.sessions);
+    app.invites = normalizeInvites(data.invites);
     await cacheShellData(data).catch(() => null);
     applyThemePalette(app.profile?.theme_palette || DEFAULT_THEME_PALETTE);
   }
@@ -1004,7 +1042,7 @@
       if (!cached?.profile) throw new Error("Sessione offline non disponibile");
       app.profile = cached.profile;
       app.user = cached.profile;
-      app.sessions = cached.sessions || [];
+      app.sessions = normalizeSessionMemberships(cached.sessions);
       app.invites = [];
       setStatus("Modalita offline: sessioni locali");
       return;
@@ -1023,15 +1061,15 @@
       if (!cached?.profile) throw error || new Error("Sessione non valida");
       app.profile = cached.profile;
       app.user = cached.profile;
-      app.sessions = cached.sessions || [];
+      app.sessions = normalizeSessionMemberships(cached.sessions);
       app.invites = [];
       setStatus("Supabase non risponde: sessioni locali");
       return;
     }
     app.profile = data.profile;
     app.user = data.profile;
-    app.sessions = data.sessions || [];
-    app.invites = data.invites || [];
+    app.sessions = normalizeSessionMemberships(data.sessions);
+    app.invites = normalizeInvites(data.invites);
     await cacheShellData(data).catch(() => null);
   }
 
@@ -1738,7 +1776,7 @@
   async function loadMasterCharacters(sessionId) {
     if (!app.client) {
       const cached = await idbGetAll("local_characters").catch(() => []);
-      app.masterCharacters = cached.filter((character) => character.session_id === sessionId);
+      app.masterCharacters = normalizeCharacters(cached.filter((character) => character.session_id === sessionId));
       renderMasterCharacters();
       setStatus("Dashboard master offline");
       return;
@@ -1757,13 +1795,13 @@
     }
     if (error) {
       const cached = await idbGetAll("local_characters").catch(() => []);
-      app.masterCharacters = cached.filter((character) => character.session_id === sessionId);
+      app.masterCharacters = normalizeCharacters(cached.filter((character) => character.session_id === sessionId));
       renderMasterCharacters();
       setStatus(app.masterCharacters.length ? "Dashboard master da dati offline" : "Nessuna scheda offline per questa sessione");
       return;
     }
 
-    app.masterCharacters = data || [];
+    app.masterCharacters = normalizeCharacters(data);
     await Promise.all(app.masterCharacters.map((character) => cacheCharacter(character, sessionId, character.owner_id || character.ownerProfile?.id || "").catch(() => null)));
     renderMasterCharacters();
   }
