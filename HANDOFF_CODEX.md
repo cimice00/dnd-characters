@@ -7,8 +7,8 @@ Questo file serve per riprendere il lavoro su un'altra macchina senza perdere co
 - Repository locale: `C:\Users\claudio.giglio\Documents\DnD Characters`
 - Branch attuale al momento dell'handoff: `main`
 - App statica frontend, senza framework.
-- Versione reale del codice: `1.7.4` per la PWA/offline-first.
-- `README.md`, `VERSION`, `manifest.webmanifest`, `manifest.json`, `sw.js` e `app-v13.js` sono allineati a `1.7.4`.
+- Versione reale del codice: `1.7.5` per la PWA/offline-first.
+- `README.md`, `VERSION`, `manifest.webmanifest`, `manifest.json`, `sw.js` e `app-v13.js` sono allineati a `1.7.5`.
 - Le ultime modifiche PWA/offline e banner sync non richiedono migrazioni database.
 
 ## File principali
@@ -21,7 +21,7 @@ Questo file serve per riprendere il lavoro su un'altra macchina senza perdere co
 - `supabase-config.js`: configurazione runtime Supabase. In locale ora e' vuota/placeholder.
 - `scripts/build-config.mjs`: genera `supabase-config.js` da variabili ambiente.
 - `sw.js`: service worker PWA.
-- `manifest.webmanifest`: manifest PWA aggiornato a `1.7.4`.
+- `manifest.webmanifest`: manifest PWA aggiornato a `1.7.5`.
 - `offline.html`: fallback pagina offline.
 - `pwa-icon.svg`: icona PWA.
 - `supabase/`: schema e migrazioni SQL.
@@ -75,10 +75,11 @@ Implementazione attuale:
 
 Fix importante gia applicata:
 
-- `sw.js` e' passato a cache `dnd-pwa-v1.7.4`;
+- `sw.js` e' passato a cache `dnd-pwa-v1.7.5`;
 - `offline.html` viene restituito solo per navigazioni, mai come fallback per `.js` o `.css`;
 - lo script Supabase CDN non e' piu caricato direttamente in `index.html`;
 - `app-v13.js` carica Supabase dinamicamente solo se serve e se c'e' rete.
+- La versione `1.7.5` rende l'accesso offline di emergenza temporaneo: dopo chiusura/uscita dalla pagina bisogna ripartire dalla schermata login e scegliere di nuovo l'accesso offline o fare login normale.
 
 Nota operativa PWA:
 

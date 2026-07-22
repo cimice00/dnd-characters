@@ -1,11 +1,13 @@
 (() => {
   const STORAGE_KEY = "dnd-mobile-character-v1";
   const APP_TOKEN_KEY = "dnd-app-account-token-v1";
+  const OFFLINE_ACCESS_ACTIVE_KEY = "dnd-offline-access-active-v1";
+  const OFFLINE_ACCESS_RELOAD_KEY = "dnd-offline-access-reload-v1";
   const OFFLINE_PROFILE_ID_KEY = "dnd-offline-profile-id-v1";
   const SESSION_ID_KEY = "dnd-mobile-session-id-v1";
   const CHARACTER_ID_KEY = "dnd-mobile-character-id-v1";
   const MASTER_PREVIEW_KEY = "dnd-master-character-preview-v1";
-  const APP_VERSION = "1.7.4";
+  const APP_VERSION = "1.7.5";
   const OFFLINE_DB_NAME = "dnd-offline-first-v1";
   const OFFLINE_DB_VERSION = 1;
   const SUPABASE_CDN_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
@@ -82,7 +84,7 @@
     syncTimer: null,
     config: window.DND_APP_CONFIG || {},
     readOnlyCharacter: false,
-    sessionToken: localStorage.getItem(APP_TOKEN_KEY) || "",
+    sessionToken: initialSessionToken(),
   };
 
   const $ = (selector) => document.querySelector(selector);
@@ -109,11 +111,39 @@
   }
 
   function selectedSessionId() {
+    if (isOfflineLocalAccessActive()) return sessionStorage.getItem(SESSION_ID_KEY) || "";
     return localStorage.getItem(SESSION_ID_KEY) || "";
   }
 
   function selectedCharacterId() {
+    if (isOfflineLocalAccessActive()) return sessionStorage.getItem(CHARACTER_ID_KEY) || "";
     return localStorage.getItem(CHARACTER_ID_KEY) || "";
+  }
+
+  function isOfflineLocalAccessActive() {
+    return sessionStorage.getItem(OFFLINE_ACCESS_ACTIVE_KEY) === "1";
+  }
+
+  function initialSessionToken() {
+    return isOfflineLocalAccessActive() ? sessionStorage.getItem(APP_TOKEN_KEY) || "" : localStorage.getItem(APP_TOKEN_KEY) || "";
+  }
+
+  function clearOfflineLocalAccess() {
+    sessionStorage.removeItem(OFFLINE_ACCESS_ACTIVE_KEY);
+    sessionStorage.removeItem(OFFLINE_ACCESS_RELOAD_KEY);
+    sessionStorage.removeItem(APP_TOKEN_KEY);
+    sessionStorage.removeItem(OFFLINE_PROFILE_ID_KEY);
+    sessionStorage.removeItem(SESSION_ID_KEY);
+    sessionStorage.removeItem(CHARACTER_ID_KEY);
+  }
+
+  function clearOfflineLocalAccessOnPageExit() {
+    if (!isOfflineLocalAccessActive()) return;
+    if (sessionStorage.getItem(OFFLINE_ACCESS_RELOAD_KEY) === "1") {
+      sessionStorage.removeItem(OFFLINE_ACCESS_RELOAD_KEY);
+      return;
+    }
+    clearOfflineLocalAccess();
   }
 
   function setText(selector, value) {
@@ -267,7 +297,7 @@
 
   async function loadCachedShell() {
     const profiles = await idbGetAll("local_profiles").catch(() => []);
-    const offlineProfileId = localStorage.getItem(OFFLINE_PROFILE_ID_KEY) || "";
+    const offlineProfileId = isOfflineLocalAccessActive() ? sessionStorage.getItem(OFFLINE_PROFILE_ID_KEY) || "" : "";
     const profile =
       profiles.find((item) => offlineProfileId && item.id === offlineProfileId) ||
       profiles.find((item) => item.token === app.sessionToken) ||
@@ -565,10 +595,16 @@
     app.currentSession = sheet.session;
     app.currentRole = "player";
     app.sessions = option.sheets.map((item) => ({ role: "player", session: item.session }));
-    localStorage.setItem(APP_TOKEN_KEY, token);
-    localStorage.setItem(OFFLINE_PROFILE_ID_KEY, profileId);
-    localStorage.setItem(SESSION_ID_KEY, sheet.session.id);
-    localStorage.setItem(CHARACTER_ID_KEY, sheet.character.id);
+    sessionStorage.setItem(OFFLINE_ACCESS_ACTIVE_KEY, "1");
+    sessionStorage.setItem(OFFLINE_ACCESS_RELOAD_KEY, "1");
+    sessionStorage.setItem(APP_TOKEN_KEY, token);
+    sessionStorage.setItem(OFFLINE_PROFILE_ID_KEY, profileId);
+    sessionStorage.setItem(SESSION_ID_KEY, sheet.session.id);
+    sessionStorage.setItem(CHARACTER_ID_KEY, sheet.character.id);
+    localStorage.removeItem(APP_TOKEN_KEY);
+    localStorage.removeItem(OFFLINE_PROFILE_ID_KEY);
+    localStorage.removeItem(SESSION_ID_KEY);
+    localStorage.removeItem(CHARACTER_ID_KEY);
     localStorage.removeItem(MASTER_PREVIEW_KEY);
     setState(state);
     setText("#loginStatus", "Apro scheda offline...");
@@ -2120,6 +2156,7 @@
       $("#loginStatus").textContent = "Accesso non riuscito.";
       return;
     }
+    clearOfflineLocalAccess();
     app.sessionToken = data.token;
     localStorage.setItem(APP_TOKEN_KEY, app.sessionToken);
     localStorage.removeItem(OFFLINE_PROFILE_ID_KEY);
@@ -2140,6 +2177,7 @@
     app.currentSession = null;
     app.currentRole = "";
     app.masterCharacters = [];
+    clearOfflineLocalAccess();
     localStorage.removeItem(APP_TOKEN_KEY);
     localStorage.removeItem(OFFLINE_PROFILE_ID_KEY);
     localStorage.removeItem(SESSION_ID_KEY);
@@ -2217,6 +2255,7 @@
   }
 
   async function init() {
+    if (!isOfflineLocalAccessActive()) localStorage.removeItem(OFFLINE_PROFILE_ID_KEY);
     bindEvents();
     showView("auth");
     registerServiceWorker();
@@ -2239,6 +2278,8 @@
       if (document.visibilityState === "hidden") saveLocalCharacterSnapshot("pending").catch(() => null);
       if (document.visibilityState === "visible") scheduleSyncQueue(500);
     });
+    window.addEventListener("pagehide", clearOfflineLocalAccessOnPageExit);
+    if (sessionStorage.getItem(OFFLINE_ACCESS_RELOAD_KEY) === "1") sessionStorage.removeItem(OFFLINE_ACCESS_RELOAD_KEY);
 
     const hasClient = await ensureSupabaseClient();
     if (!hasClient) {
