@@ -253,7 +253,7 @@ function normalizeResource(resource = {}, index = 0) {
     name: resource.name || "",
     current: Number(resource.current) || 0,
     max: Number(resource.max) || 0,
-    recovery: ["short", "long", "short_long"].includes(resource.recovery) ? resource.recovery : "none",
+    recovery: resource.recovery === "short_long" ? "short" : ["short", "long"].includes(resource.recovery) ? resource.recovery : "none",
   };
 }
 
@@ -507,7 +507,7 @@ function actionResource(action) {
 }
 
 function resourceRecoveryLabel(resource) {
-  return { short: "riposo breve", long: "riposo lungo", short_long: "riposo breve/lungo" }[resource?.recovery] || "nessun recupero";
+  return { short: "riposo breve", long: "riposo lungo" }[resource?.recovery] || "nessun recupero";
 }
 
 function actionResolutionSummary(action) {
@@ -518,7 +518,8 @@ function actionResolutionSummary(action) {
 
 function actionAvailabilitySummary(action) {
   const resource = actionResource(action);
-  return resource ? resource.name + " " + resource.current + "/" + resource.max + " · " + resourceRecoveryLabel(resource) : "Sempre";
+  if (!resource || resource.recovery === "none") return "";
+  return resource.name + " " + resource.current + "/" + resource.max + " · " + resourceRecoveryLabel(resource);
 }
 
 function actionDamageSummary(action) {
@@ -534,6 +535,26 @@ function actionQuickEffectSummary(action) {
   if (action.effectType === "healing") return "Cura " + (action.effectValue || "-");
   if (action.effectType === "condition") return "Condizione " + (action.effectValue || "-");
   return action.effectValue || "Effetto";
+}
+
+function actionQuickSummary(action) {
+  return [
+    actionActivationLabels[action.activation],
+    actionResolutionSummary(action),
+    actionQuickEffectSummary(action),
+    actionAvailabilitySummary(action),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function updateActionQuickSummary(index) {
+  const action = state.actions[index];
+  if (!action) return;
+  const summary = document.querySelector('[data-action-summary="' + index + '"]');
+  if (summary) summary.textContent = actionQuickSummary(action);
+  const name = document.querySelector('[data-action-name="' + index + '"]');
+  if (name) name.textContent = action.name || "Nuova azione";
 }
 
 function actionResourceOptions(action) {
@@ -583,7 +604,7 @@ function renderActions() {
           const costFields = resource
             ? '<label class="field"><span>Consuma</span><input data-action="' + index + '" data-action-field="resourceAmount" type="number" min="1" inputmode="numeric" value="' + escapeAttribute(action.resourceAmount) + '" /></label>'
             : "";
-          return '<details class="action-card" data-action-card="' + index + '"' + (action.id === openActionId ? " open" : "") + '><summary><span>' + escapeHtml(action.name || "Nuova azione") + '</span><small>' + escapeHtml(actionActivationLabels[action.activation]) + " · " + escapeHtml(actionResolutionSummary(action)) + " · " + escapeHtml(actionQuickEffectSummary(action)) + " · " + escapeHtml(actionAvailabilitySummary(action)) + '</small></summary><div class="action-editor"><div class="action-grid"><label class="field full-row"><span>Nome</span><input data-action="' + index + '" data-action-field="name" value="' + escapeAttribute(action.name) + '" /></label><label class="field"><span>Attivazione</span><select data-action="' + index + '" data-action-field="activation" data-action-rerender="true">' + optionList(actionActivationLabels, action.activation) + '</select></label><label class="field"><span>Bersaglio</span><select data-action="' + index + '" data-action-field="target">' + optionList(actionTargetLabels, action.target) + '</select></label><label class="field full-row"><span>Risoluzione</span><select data-action="' + index + '" data-action-field="resolutionType" data-action-rerender="true">' + optionList(actionResolutionLabels, action.resolutionType) + '</select></label>' + resolutionFields + actionEffectFields(action, index) + '<label class="field full-row"><span>Disponibilita</span><select data-action="' + index + '" data-action-field="resourceId" data-action-rerender="true">' + actionResourceOptions(action) + '</select></label>' + costFields + '<label class="field full-row"><span>Note</span><textarea data-action="' + index + '" data-action-field="notes" rows="2">' + escapeHtml(action.notes) + '</textarea></label></div><div class="action-card-footer">' + (resource ? '<button class="small-button" data-use-action="' + index + '" type="button"' + (canUse ? "" : " disabled") + ">Usa (" + action.resourceAmount + ")</button>" : '<small>Sempre disponibile</small>') + '<button class="small-button remove-action" data-remove-action="' + index + '" type="button">Rimuovi</button></div></div></details>';
+          return '<details class="action-card" data-action-card="' + index + '"' + (action.id === openActionId ? " open" : "") + '><summary><span data-action-name="' + index + '">' + escapeHtml(action.name || "Nuova azione") + '</span><small data-action-summary="' + index + '">' + escapeHtml(actionQuickSummary(action)) + '</small></summary><div class="action-editor"><div class="action-grid"><label class="field full-row"><span>Nome</span><input data-action="' + index + '" data-action-field="name" value="' + escapeAttribute(action.name) + '" /></label><label class="field"><span>Attivazione</span><select data-action="' + index + '" data-action-field="activation" data-action-rerender="true">' + optionList(actionActivationLabels, action.activation) + '</select></label><label class="field"><span>Bersaglio</span><select data-action="' + index + '" data-action-field="target">' + optionList(actionTargetLabels, action.target) + '</select></label><label class="field full-row"><span>Risoluzione</span><select data-action="' + index + '" data-action-field="resolutionType" data-action-rerender="true">' + optionList(actionResolutionLabels, action.resolutionType) + '</select></label>' + resolutionFields + actionEffectFields(action, index) + '<label class="field full-row"><span>Disponibilita</span><select data-action="' + index + '" data-action-field="resourceId" data-action-rerender="true">' + actionResourceOptions(action) + '</select></label>' + costFields + '<label class="field full-row"><span>Note</span><textarea data-action="' + index + '" data-action-field="notes" rows="2">' + escapeHtml(action.notes) + '</textarea></label></div><div class="action-card-footer">' + (resource ? '<button class="small-button" data-use-action="' + index + '" type="button"' + (canUse ? "" : " disabled") + ">Usa (" + action.resourceAmount + ")</button>" : "") + '<button class="small-button remove-action" data-remove-action="' + index + '" type="button">Rimuovi</button></div></div></details>';
         })
         .join("")
     : '<div class="empty-state">Nessuna azione. Aggiungine una per iniziare.</div>';
@@ -601,6 +622,7 @@ function renderActions() {
       if (!action) return;
       action[field.dataset.actionField] = field.type === "number" ? Math.max(1, Number(field.value) || 1) : field.value;
       saveState();
+      updateActionQuickSummary(Number(field.dataset.action));
       if (field.dataset.actionRerender === "true") renderActions();
     };
     field.addEventListener(field.tagName === "SELECT" ? "change" : "input", update);
@@ -1134,7 +1156,7 @@ function renderResources() {
               <label><span>Nome</span><input data-resource="${index}" data-resource-field="name" value="${escapeAttribute(resource.name)}" /></label>
               <label><span>Attuale</span><input data-resource="${index}" data-resource-field="current" type="number" inputmode="numeric" value="${escapeAttribute(resource.current)}" /></label>
               <label><span>Max</span><input data-resource="${index}" data-resource-field="max" type="number" inputmode="numeric" value="${escapeAttribute(resource.max)}" /></label>
-              <label><span>Recupero</span><select data-resource="${index}" data-resource-field="recovery"><option value="none" ${resource.recovery === "none" ? "selected" : ""}>Mai</option><option value="short" ${resource.recovery === "short" ? "selected" : ""}>Breve</option><option value="long" ${resource.recovery === "long" ? "selected" : ""}>Lungo</option><option value="short_long" ${resource.recovery === "short_long" ? "selected" : ""}>Breve/lungo</option></select></label>
+              <label><span>Recupero</span><select data-resource="${index}" data-resource-field="recovery"><option value="none" ${resource.recovery === "none" ? "selected" : ""}>Mai</option><option value="short" ${resource.recovery === "short" ? "selected" : ""}>Breve</option><option value="long" ${resource.recovery === "long" ? "selected" : ""}>Lungo</option></select></label>
               <button class="small-button remove-resource" data-remove-resource="${index}" type="button">Rimuovi</button>
             </article>
           `
