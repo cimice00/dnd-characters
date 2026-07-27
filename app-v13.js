@@ -8,7 +8,7 @@
   const CHARACTER_ID_KEY = "dnd-mobile-character-id-v1";
   const MASTER_PREVIEW_KEY = "dnd-master-character-preview-v1";
   const SYNC_BANNER_PREF_KEY = "dnd-character-sync-banner-v1";
-  const APP_VERSION = "1.7.11";
+  const APP_VERSION = "1.7.12";
   const OFFLINE_DB_NAME = "dnd-offline-first-v1";
   const OFFLINE_DB_VERSION = 1;
   const SUPABASE_CDN_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
@@ -888,7 +888,7 @@
       },
       saveProficiencies: {},
       skillProficiencies: {},
-      attacks: [{ name: "", bonus: "", damage: "" }],
+      actions: [],
       slots: [],
       knownSpellIds: [],
       preparedSpellIds: [],
@@ -1585,10 +1585,14 @@
       ["Privilegi e tratti", state.featuresTraits],
     ]);
 
-    addPdfSection(lines, "Attacchi");
-    const attacks = Array.isArray(state.attacks) ? state.attacks : [];
-    if (attacks.length) {
-      attacks.forEach((attack, index) => addPdfWrapped(lines, `${index + 1}. ${valueOrDash(attack.name)} | Bonus ${valueOrDash(attack.bonus)} | Danni ${valueOrDash(attack.damage)}`));
+    addPdfSection(lines, "Azioni");
+    const actions = Array.isArray(state.actions)
+      ? state.actions
+      : Array.isArray(state.attacks)
+        ? state.attacks.map((attack) => ({ ...attack, resolutionType: "attack_roll", attackBonus: attack.bonus, effectType: "damage", effectValue: attack.damage }))
+        : [];
+    if (actions.length) {
+      actions.forEach((action, index) => addPdfWrapped(lines, `${index + 1}. ${formatPdfAction(action, state.resources)}`));
     } else {
       addPdfWrapped(lines, "-");
     }
@@ -2336,6 +2340,24 @@
     $("#characterView").addEventListener("input", queueCharacterSave, true);
     $("#characterView").addEventListener("change", queueCharacterSave, true);
     $("#characterView").addEventListener("click", queueCharacterSave);
+  }
+
+  function formatPdfAction(action = {}, resources = []) {
+    const activation = { action: "Azione", bonus_action: "Azione bonus", reaction: "Reazione", free: "Gratuita" }[action.activation] || "Azione";
+    const resolution =
+      action.resolutionType === "attack_roll"
+        ? `Tiro ${valueOrDash(action.attackBonus ?? action.bonus)}`
+        : action.resolutionType === "saving_throw"
+          ? `TS ${String(action.saveAbility || "").slice(0, 3).toUpperCase()} CD ${valueOrDash(action.saveDc)}`
+          : action.resolutionType === "support"
+            ? "Supporto"
+            : "Azione libera";
+    const effectLabel = { damage: "Danni", healing: "Cura", condition: "Condizione", custom: "Effetto" }[action.effectType] || "Effetto";
+    const effect = action.effectValue ?? action.damage ?? action.healing ?? action.condition ?? "";
+    const detail = action.effectDetail ?? action.conditionDuration ?? "";
+    const resource = Array.isArray(resources) ? resources.find((item) => item.id === action.resourceId) : null;
+    const cost = resource ? `${resource.name || "Risorsa"} ${Number(resource.current) || 0}/${Number(resource.max) || 0}` : "Sempre";
+    return `${valueOrDash(action.name)} | ${activation} | ${resolution} | ${effectLabel} ${valueOrDash(effect)}${detail ? ` (${detail})` : ""} | ${cost}`;
   }
 
   function bindButtonPressFeedback() {

@@ -128,10 +128,10 @@ const defaultState = {
     stealth: true,
     sleightOfHand: true,
   },
-  attacks: [
-    { name: "Stocco", bonus: "+5", damage: "1d8+3 perforante" },
-    { name: "Arco corto", bonus: "+5", damage: "1d6+3 perforante" },
-    { name: "Dardo di Fuoco", bonus: "+5", damage: "1d10 fuoco" },
+  actions: [
+    { id: "action-stocco", name: "Stocco", activation: "action", target: "enemy", resolutionType: "attack_roll", attackBonus: "+5", saveAbility: "dexterity", saveDc: "", successOutcome: "", damage: "1d8+3 perforante", healing: "", condition: "", conditionDuration: "", resourceId: "", resourceAmount: 1, notes: "" },
+    { id: "action-arco-corto", name: "Arco corto", activation: "action", target: "enemy", resolutionType: "attack_roll", attackBonus: "+5", saveAbility: "dexterity", saveDc: "", successOutcome: "", damage: "1d6+3 perforante", healing: "", condition: "", conditionDuration: "", resourceId: "", resourceAmount: 1, notes: "" },
+    { id: "action-dardo-di-fuoco", name: "Dardo di Fuoco", activation: "action", target: "enemy", resolutionType: "attack_roll", attackBonus: "+5", saveAbility: "dexterity", saveDc: "", successOutcome: "", damage: "1d10 fuoco", healing: "", condition: "", conditionDuration: "", resourceId: "", resourceAmount: 1, notes: "" },
   ],
   slots: [
     { level: 1, current: 2, max: 2 },
@@ -152,7 +152,7 @@ const defaultState = {
     { name: "Arnesi da scasso", description: "Usati per serrature, trappole e piccoli meccanismi." },
   ],
   resources: [
-    { name: "Frecce", current: 17, max: 20 },
+    { id: "resource-frecce", name: "Frecce", current: 17, max: 20, recovery: "none" },
   ],
   treasure: "",
   background: "Criminale",
@@ -182,6 +182,7 @@ const defaultState = {
 
 let state = loadState();
 let openEquipmentIndex = null;
+let openActionId = null;
 
 function loadState() {
   try {
@@ -223,10 +224,68 @@ function mergeState(base, patch) {
   if (!Array.isArray(next.resources)) {
     next.resources = [];
   }
+  next.resources = next.resources.map((resource, index) => normalizeResource(resource, index));
+  const sourceActions = Array.isArray(patch.actions) ? patch.actions : Array.isArray(patch.attacks) ? patch.attacks : next.actions;
+  next.actions = Array.isArray(sourceActions) ? sourceActions.map((action, index) => normalizeAction(action, index)) : [];
+  delete next.attacks;
   if (!["it", "en"].includes(next.spellLanguage)) {
     next.spellLanguage = "it";
   }
   return next;
+}
+
+function slug(value) {
+  return String(value || "azione")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "") || "azione";
+}
+
+function newId(prefix) {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function normalizeResource(resource = {}, index = 0) {
+  return {
+    id: resource.id || `resource-${index}-${slug(resource.name)}`,
+    name: resource.name || "",
+    current: Number(resource.current) || 0,
+    max: Number(resource.max) || 0,
+    recovery: ["short", "long", "short_long"].includes(resource.recovery) ? resource.recovery : "none",
+  };
+}
+
+function normalizeAction(action = {}, index = 0) {
+  const resolutionType = ["attack_roll", "saving_throw", "support", "utility"].includes(action.resolutionType)
+    ? action.resolutionType
+    : "attack_roll";
+  return {
+    id: action.id || `action-${index}-${slug(action.name)}`,
+    name: action.name || "",
+    activation: ["action", "bonus_action", "reaction", "free"].includes(action.activation) ? action.activation : "action",
+    target: ["self", "ally", "enemy", "area"].includes(action.target) ? action.target : "enemy",
+    resolutionType,
+    attackBonus: action.attackBonus ?? action.bonus ?? "",
+    saveAbility: action.saveAbility || "dexterity",
+    saveDc: action.saveDc ?? "",
+    successOutcome: action.successOutcome || "",
+    effectType: ["damage", "healing", "condition", "custom"].includes(action.effectType)
+      ? action.effectType
+      : action.healing
+        ? "healing"
+        : action.condition
+          ? "condition"
+          : action.damage
+            ? "damage"
+            : "custom",
+    effectValue: action.effectValue ?? action.damage ?? action.healing ?? action.condition ?? "",
+    effectDetail: action.effectDetail ?? action.conditionDuration ?? "",
+    resourceId: action.resourceId || "",
+    resourceAmount: Math.max(1, Number(action.resourceAmount) || 1),
+    notes: action.notes || "",
+  };
 }
 
 function saveState() {
@@ -396,34 +455,134 @@ function abilityLabel(key) {
   return abilities.find(([abilityKey]) => abilityKey === key)?.[1] || "";
 }
 
-function renderAttacks() {
-  const list = document.getElementById("attackList");
-  list.innerHTML = state.attacks
-    .map(
-      (attack, index) => `
-        <article class="attack-row">
-          <label><span>Nome</span><input data-attack="${index}" data-attack-field="name" value="${escapeAttribute(attack.name)}" /></label>
-          <label><span>Bonus</span><input data-attack="${index}" data-attack-field="bonus" value="${escapeAttribute(attack.bonus)}" /></label>
-          <label><span>Danni / tipo</span><input data-attack="${index}" data-attack-field="damage" value="${escapeAttribute(attack.damage)}" /></label>
-          <button class="remove-attack" data-remove-attack="${index}" type="button" aria-label="Rimuovi attacco" title="Rimuovi attacco">×</button>
-        </article>
-      `
+const actionActivationLabels = {
+  action: "Azione",
+  bonus_action: "Azione bonus",
+  reaction: "Reazione",
+  free: "Gratuita",
+};
+
+const actionTargetLabels = {
+  self: "Se stesso",
+  ally: "Alleato",
+  enemy: "Nemico",
+  area: "Area",
+};
+
+const actionResolutionLabels = {
+  attack_roll: "Tiro per colpire",
+  saving_throw: "Tiro salvezza / CD",
+  support: "Cura o supporto",
+  utility: "Azione libera",
+};
+
+const actionEffectLabels = {
+  damage: "Danno",
+  healing: "Cura",
+  condition: "Condizione",
+  custom: "Effetto testuale",
+};
+
+function optionList(labels, selected) {
+  return Object.entries(labels)
+    .map(([value, label]) => '<option value="' + value + '"' + (value === selected ? " selected" : "") + ">" + label + "</option>")
+    .join("");
+}
+
+function actionResource(action) {
+  return state.resources.find((resource) => resource.id === action.resourceId) || null;
+}
+
+function resourceRecoveryLabel(resource) {
+  return { short: "riposo breve", long: "riposo lungo", short_long: "riposo breve/lungo" }[resource?.recovery] || "nessun recupero";
+}
+
+function actionResolutionSummary(action) {
+  if (action.resolutionType === "attack_roll") return "Tiro " + (action.attackBonus || "-");
+  if (action.resolutionType === "saving_throw") return "TS " + abilityLabel(action.saveAbility).toUpperCase() + " CD " + (action.saveDc || "-");
+  return actionResolutionLabels[action.resolutionType];
+}
+
+function actionAvailabilitySummary(action) {
+  const resource = actionResource(action);
+  return resource ? resource.name + " " + resource.current + "/" + resource.max + " · " + resourceRecoveryLabel(resource) : "Sempre";
+}
+
+function actionResourceOptions(action) {
+  return ['<option value="">Sempre disponibile</option>']
+    .concat(
+      state.resources.map(
+        (resource) =>
+          '<option value="' + escapeAttribute(resource.id) + '"' + (resource.id === action.resourceId ? " selected" : "") + ">" + escapeHtml(resource.name || "Risorsa") + " (" + resource.current + "/" + resource.max + ")</option>"
+      )
     )
     .join("");
+}
 
-  list.querySelectorAll("[data-attack]").forEach((input) => {
-    input.addEventListener("input", () => {
-      state.attacks[Number(input.dataset.attack)][input.dataset.attackField] = input.value;
-      saveState();
+function actionEffectPlaceholder(type) {
+  return { damage: "es. 2d6 fuoco", healing: "es. 1d8 + 3 PF", condition: "es. Avvelenato", custom: "Descrivi l'effetto" }[type] || "";
+}
+
+function renderActions() {
+  const list = document.getElementById("actionList");
+  if (!list) return;
+  list.innerHTML = state.actions.length
+    ? state.actions
+        .map((action, index) => {
+          const resource = actionResource(action);
+          const canUse = resource && Number(resource.current) >= Number(action.resourceAmount || 1);
+          const resolutionFields =
+            action.resolutionType === "attack_roll"
+              ? '<label class="field"><span>Bonus al tiro</span><input data-action="' + index + '" data-action-field="attackBonus" value="' + escapeAttribute(action.attackBonus) + '" placeholder="es. +5" /></label>'
+              : action.resolutionType === "saving_throw"
+                ? '<label class="field"><span>TS</span><select data-action="' + index + '" data-action-field="saveAbility" data-action-rerender="true">' + optionList({ strength: "Forza", dexterity: "Destrezza", constitution: "Costituzione", intelligence: "Intelligenza", wisdom: "Saggezza", charisma: "Carisma" }, action.saveAbility) + '</select></label><label class="field"><span>Classe difficolta</span><input data-action="' + index + '" data-action-field="saveDc" type="number" inputmode="numeric" value="' + escapeAttribute(action.saveDc) + '" /></label><label class="field full-row"><span>Con successo</span><input data-action="' + index + '" data-action-field="successOutcome" value="' + escapeAttribute(action.successOutcome) + '" placeholder="es. meta danni" /></label>'
+                : "";
+          const costFields = resource
+            ? '<label class="field"><span>Consuma</span><input data-action="' + index + '" data-action-field="resourceAmount" type="number" min="1" inputmode="numeric" value="' + escapeAttribute(action.resourceAmount) + '" /></label>'
+            : "";
+          return '<details class="action-card" data-action-card="' + index + '"' + (action.id === openActionId ? " open" : "") + '><summary><span>' + escapeHtml(action.name || "Nuova azione") + '</span><small>' + escapeHtml(actionActivationLabels[action.activation]) + " · " + escapeHtml(actionResolutionSummary(action)) + " · " + escapeHtml(actionAvailabilitySummary(action)) + '</small></summary><div class="action-editor"><div class="action-grid"><label class="field full-row"><span>Nome</span><input data-action="' + index + '" data-action-field="name" value="' + escapeAttribute(action.name) + '" /></label><label class="field"><span>Attivazione</span><select data-action="' + index + '" data-action-field="activation" data-action-rerender="true">' + optionList(actionActivationLabels, action.activation) + '</select></label><label class="field"><span>Bersaglio</span><select data-action="' + index + '" data-action-field="target">' + optionList(actionTargetLabels, action.target) + '</select></label><label class="field full-row"><span>Risoluzione</span><select data-action="' + index + '" data-action-field="resolutionType" data-action-rerender="true">' + optionList(actionResolutionLabels, action.resolutionType) + '</select></label>' + resolutionFields + '<label class="field"><span>Effetto</span><select data-action="' + index + '" data-action-field="effectType" data-action-rerender="true">' + optionList(actionEffectLabels, action.effectType) + '</select></label><label class="field"><span>' + escapeHtml(actionEffectLabels[action.effectType]) + '</span><input data-action="' + index + '" data-action-field="effectValue" value="' + escapeAttribute(action.effectValue) + '" placeholder="' + escapeAttribute(actionEffectPlaceholder(action.effectType)) + '" /></label>' + (action.effectType === "condition" ? '<label class="field full-row"><span>Durata</span><input data-action="' + index + '" data-action-field="effectDetail" value="' + escapeAttribute(action.effectDetail) + '" placeholder="es. 1 round" /></label>' : action.effectType === "custom" ? '<label class="field full-row"><span>Dettagli</span><input data-action="' + index + '" data-action-field="effectDetail" value="' + escapeAttribute(action.effectDetail) + '" /></label>' : "") + '<label class="field full-row"><span>Disponibilita</span><select data-action="' + index + '" data-action-field="resourceId" data-action-rerender="true">' + actionResourceOptions(action) + '</select></label>' + costFields + '<label class="field full-row"><span>Note</span><textarea data-action="' + index + '" data-action-field="notes" rows="2">' + escapeHtml(action.notes) + '</textarea></label></div><div class="action-card-footer">' + (resource ? '<button class="small-button" data-use-action="' + index + '" type="button"' + (canUse ? "" : " disabled") + ">Usa (" + action.resourceAmount + ")</button>" : '<small>Sempre disponibile</small>') + '<button class="small-button remove-action" data-remove-action="' + index + '" type="button">Rimuovi</button></div></div></details>';
+        })
+        .join("")
+    : '<div class="empty-state">Nessuna azione. Aggiungine una per iniziare.</div>';
+
+  list.querySelectorAll("[data-action-card]").forEach((card) => {
+    card.addEventListener("toggle", () => {
+      const action = state.actions[Number(card.dataset.actionCard)];
+      openActionId = card.open ? action?.id || null : openActionId === action?.id ? null : openActionId;
     });
   });
 
-  list.querySelectorAll("[data-remove-attack]").forEach((button) => {
-    button.addEventListener("click", () => {
-      if (state.attacks.length === 1) return;
-      state.attacks.splice(Number(button.dataset.removeAttack), 1);
-      renderAttacks();
+  list.querySelectorAll("[data-action]").forEach((field) => {
+    const update = () => {
+      const action = state.actions[Number(field.dataset.action)];
+      if (!action) return;
+      action[field.dataset.actionField] = field.type === "number" ? Math.max(1, Number(field.value) || 1) : field.value;
       saveState();
+      if (field.dataset.actionRerender === "true") renderActions();
+    };
+    field.addEventListener(field.tagName === "SELECT" ? "change" : "input", update);
+  });
+
+  list.querySelectorAll("[data-use-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const action = state.actions[Number(button.dataset.useAction)];
+      const resource = action && actionResource(action);
+      const amount = Number(action?.resourceAmount) || 1;
+      if (!resource || Number(resource.current) < amount) return;
+      resource.current = Math.max(0, Number(resource.current) - amount);
+      saveState();
+      renderResources();
+      renderActions();
+    });
+  });
+
+  list.querySelectorAll("[data-remove-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const action = state.actions[Number(button.dataset.removeAction)];
+      state.actions.splice(Number(button.dataset.removeAction), 1);
+      if (openActionId === action?.id) openActionId = null;
+      saveState();
+      renderActions();
     });
   });
 }
@@ -932,6 +1091,7 @@ function renderResources() {
               <label><span>Nome</span><input data-resource="${index}" data-resource-field="name" value="${escapeAttribute(resource.name)}" /></label>
               <label><span>Attuale</span><input data-resource="${index}" data-resource-field="current" type="number" inputmode="numeric" value="${escapeAttribute(resource.current)}" /></label>
               <label><span>Max</span><input data-resource="${index}" data-resource-field="max" type="number" inputmode="numeric" value="${escapeAttribute(resource.max)}" /></label>
+              <label><span>Recupero</span><select data-resource="${index}" data-resource-field="recovery"><option value="none" ${resource.recovery === "none" ? "selected" : ""}>Mai</option><option value="short" ${resource.recovery === "short" ? "selected" : ""}>Breve</option><option value="long" ${resource.recovery === "long" ? "selected" : ""}>Lungo</option><option value="short_long" ${resource.recovery === "short_long" ? "selected" : ""}>Breve/lungo</option></select></label>
               <button class="small-button remove-resource" data-remove-resource="${index}" type="button">Rimuovi</button>
             </article>
           `
@@ -940,18 +1100,23 @@ function renderResources() {
     : `<div class="empty-state">Nessuna risorsa.</div>`;
 
   list.querySelectorAll("[data-resource]").forEach((field) => {
-    field.addEventListener("input", () => {
+    field.addEventListener(field.tagName === "SELECT" ? "change" : "input", () => {
       const index = Number(field.dataset.resource);
       const key = field.dataset.resourceField;
       state.resources[index][key] = field.type === "number" ? Number(field.value) : field.value;
       saveState();
+      if (key === "name" || key === "current" || key === "max" || key === "recovery") renderActions();
     });
   });
 
   list.querySelectorAll("[data-remove-resource]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.resources.splice(Number(button.dataset.removeResource), 1);
+      const removed = state.resources.splice(Number(button.dataset.removeResource), 1)[0];
+      if (removed?.id) state.actions.forEach((action) => {
+        if (action.resourceId === removed.id) action.resourceId = "";
+      });
       renderResources();
+      renderActions();
       saveState();
     });
   });
@@ -1059,7 +1224,7 @@ function bindActions() {
     saveState();
   });
   document.getElementById("addResourceButton").addEventListener("click", () => {
-    state.resources.push({ name: "Nuova risorsa", current: 0, max: 0 });
+    state.resources.push({ id: newId("resource"), name: "Nuova risorsa", current: 0, max: 0, recovery: "none" });
     renderResources();
     saveState();
   });
@@ -1070,9 +1235,21 @@ function bindActions() {
     renderSlots();
     saveState();
   });
-  document.getElementById("addAttackButton").addEventListener("click", () => {
-    state.attacks.push({ name: "", bonus: "", damage: "" });
-    renderAttacks();
+  document.getElementById("addActionButton").addEventListener("click", () => {
+    const type = document.getElementById("actionTypeToAdd")?.value || "attack_roll";
+    const action = normalizeAction(
+      {
+        id: newId("action"),
+        name: "",
+        resolutionType: type,
+        target: type === "support" ? "ally" : type === "utility" ? "self" : "enemy",
+        effectType: type === "support" ? "healing" : type === "utility" ? "custom" : "damage",
+      },
+      state.actions.length
+    );
+    state.actions.push(action);
+    openActionId = action.id;
+    renderActions();
     saveState();
   });
   document.getElementById("themeButton").addEventListener("click", toggleTheme);
@@ -1113,7 +1290,7 @@ function init() {
   bindClassLevelControls();
   renderAbilities();
   renderChecks();
-  renderAttacks();
+  renderActions();
   renderSlots();
   populateSpellFilters();
   renderSpellPicker();

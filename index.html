@@ -314,10 +314,18 @@
 
       <section class="attacks-panel">
         <div class="section-title action-title">
-          <span>Attacchi & Incantesimi</span>
-          <button class="small-button" id="addAttackButton" type="button">+</button>
+          <span>Azioni</span>
+          <div class="action-add-row">
+            <select id="actionTypeToAdd" aria-label="Tipo di azione">
+              <option value="attack_roll">Tiro per colpire</option>
+              <option value="saving_throw">Tiro salvezza / CD</option>
+              <option value="support">Cura o supporto</option>
+              <option value="utility">Azione libera</option>
+            </select>
+            <button class="small-button" id="addActionButton" type="button">Aggiungi</button>
+          </div>
         </div>
-        <div class="attack-list" id="attackList"></div>
+        <div class="action-list" id="actionList"></div>
       </section>
 
       <nav class="tab-bar" aria-label="Sezioni scheda">
@@ -487,6 +495,7 @@
           <span>Risorse</span>
           <button class="small-button" id="addResourceButton" type="button">+</button>
         </div>
+        <p class="muted-line">Il recupero e' solo informativo per ora: il ripristino automatico verra' aggiunto in seguito.</p>
         <div class="resource-list" id="resourceList"></div>
       </section>
 
