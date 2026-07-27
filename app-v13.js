@@ -8,7 +8,7 @@
   const CHARACTER_ID_KEY = "dnd-mobile-character-id-v1";
   const MASTER_PREVIEW_KEY = "dnd-master-character-preview-v1";
   const SYNC_BANNER_PREF_KEY = "dnd-character-sync-banner-v1";
-  const APP_VERSION = "1.7.17";
+  const APP_VERSION = "1.7.19";
   const OFFLINE_DB_NAME = "dnd-offline-first-v1";
   const OFFLINE_DB_VERSION = 1;
   const SUPABASE_CDN_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
@@ -892,6 +892,7 @@
       slots: [],
       knownSpellIds: [],
       preparedSpellIds: [],
+      preparedSpellLimit: "",
       customSpells: [],
       proficienciesLanguages: "",
       equipment: "",
@@ -1601,6 +1602,7 @@
     addPdfKeyValues(lines, [
       ["CD incantesimi", state.spellDc],
       ["Bonus attacco inc.", state.spellAttack],
+      ["Incantesimi preparati", `${Array.isArray(state.preparedSpellIds) ? state.preparedSpellIds.length : 0} / ${state.preparedSpellLimit === "" || state.preparedSpellLimit === null || state.preparedSpellLimit === undefined ? "-" : state.preparedSpellLimit}`],
       ["Slot", formatSpellSlots(state.slots)],
       ["Trucchetti testuali", state.cantrips],
       ["Incantesimi testuali", state.spells],
@@ -1633,8 +1635,9 @@
     const customSpells = Array.isArray(state.customSpells) ? state.customSpells : [];
     const spells = [...officialSpellsForState(state), ...customSpells];
     const spellById = new Map(spells.map((spell) => [spell.id, spell]));
-    const knownIds = Array.isArray(state.knownSpellIds) ? state.knownSpellIds : [];
+    const knownIds = (Array.isArray(state.knownSpellIds) ? state.knownSpellIds : []).slice();
     const preparedIds = new Set(Array.isArray(state.preparedSpellIds) ? state.preparedSpellIds : []);
+    knownIds.sort((left, right) => Number(preparedIds.has(right)) - Number(preparedIds.has(left)));
     if (!knownIds.length) {
       addPdfWrapped(lines, "Incantesimi del personaggio: -");
     } else {

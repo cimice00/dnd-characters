@@ -141,6 +141,7 @@ const defaultState = {
   spellLanguage: "it",
   knownSpellIds: [],
   preparedSpellIds: [],
+  preparedSpellLimit: "",
   customSpells: [],
   proficienciesLanguages: "Arnesi da scasso, strumenti da gioco; Comune, Elfico, Nanico",
   equipment: "Armatura di cuoio, stocco, arco corto, faretra, arnesi da scasso",
@@ -214,6 +215,11 @@ function mergeState(base, patch) {
   }
   if (!Array.isArray(next.preparedSpellIds)) {
     next.preparedSpellIds = [];
+  }
+  if (next.preparedSpellLimit !== "" && next.preparedSpellLimit !== null && next.preparedSpellLimit !== undefined) {
+    next.preparedSpellLimit = Math.max(0, Math.floor(Number(next.preparedSpellLimit) || 0));
+  } else {
+    next.preparedSpellLimit = "";
   }
   if (!Array.isArray(next.customSpells)) {
     next.customSpells = [];
@@ -339,7 +345,7 @@ function bindFields() {
       field.max = Number(state.hpMax) || 0;
     }
     field.addEventListener("input", () => {
-      state[key] = field.type === "number" ? Number(field.value) : field.value;
+      state[key] = key === "preparedSpellLimit" ? (field.value === "" ? "" : Math.max(0, Math.floor(Number(field.value) || 0))) : field.type === "number" ? Number(field.value) : field.value;
       if (key === "hpCurrent" || key === "hpMax") {
         clampHitPoints();
         const hpInput = document.querySelector('[data-field="hpCurrent"]');
@@ -357,6 +363,11 @@ function bindFields() {
       if (key === "spellLanguage") {
         state.spellLanguage = field.value === "en" ? "en" : "it";
         populateSpellFilters();
+        renderSpellPicker();
+      }
+      if (key === "preparedSpellLimit") {
+        enforcePreparedSpellLimit();
+        saveState();
         renderSpellPicker();
       }
     });
@@ -833,6 +844,30 @@ function syncSpellClassFilter(onlyIfEmpty) {
   }
 }
 
+function preparedSpellLimit() {
+  return state.preparedSpellLimit === "" || state.preparedSpellLimit === null || state.preparedSpellLimit === undefined
+    ? null
+    : Math.max(0, Math.floor(Number(state.preparedSpellLimit) || 0));
+}
+
+function preparedSpellCount() {
+  return state.preparedSpellIds.length;
+}
+
+function enforcePreparedSpellLimit() {
+  const limit = preparedSpellLimit();
+  if (limit !== null && state.preparedSpellIds.length > limit) {
+    state.preparedSpellIds = state.preparedSpellIds.slice(0, limit);
+  }
+}
+
+function updatePreparedSpellSummary() {
+  const summary = document.getElementById("preparedSpellCount");
+  if (!summary) return;
+  const limit = preparedSpellLimit();
+  summary.textContent = `${preparedSpellCount()} / ${limit === null ? "—" : limit}`;
+}
+
 function renderSpellPicker() {
   const list = document.getElementById("spellList");
   const knownList = document.getElementById("knownSpellList");
@@ -846,8 +881,16 @@ function renderSpellPicker() {
   const sourceValue = document.getElementById("spellSourceFilter")?.value || "";
   const searchValue = normalizedText(document.getElementById("spellSearchInput")?.value || "");
   const knownIds = new Set(state.knownSpellIds);
+  state.preparedSpellIds = state.preparedSpellIds.filter((id) => knownIds.has(id));
+  enforcePreparedSpellLimit();
+  const preparedIds = new Set(state.preparedSpellIds);
+  updatePreparedSpellSummary();
 
-  const knownSpells = state.knownSpellIds.map((id) => spellById.get(id)).filter(Boolean);
+  const knownSpells = state.knownSpellIds
+    .map((id, index) => ({ spell: spellById.get(id), index }))
+    .filter(({ spell }) => Boolean(spell))
+    .sort((left, right) => Number(preparedIds.has(right.spell.id)) - Number(preparedIds.has(left.spell.id)) || left.index - right.index)
+    .map(({ spell }) => spell);
   knownList.innerHTML = knownSpells.length
     ? `
       <div class="section-title compact-title">
@@ -855,7 +898,7 @@ function renderSpellPicker() {
         <small>${knownSpells.length}</small>
       </div>
       <div class="known-spell-list">
-        ${knownSpells.map((spell) => renderKnownSpell(spell)).join("")}
+        ${knownSpells.map((spell) => renderKnownSpell(spell, preparedIds, preparedSpellLimit())).join("")}
       </div>
     `
     : `<div class="empty-state">Nessun incantesimo aggiunto.</div>`;
@@ -924,7 +967,8 @@ function renderSpellPicker() {
     input.addEventListener("change", () => {
       const id = input.dataset.preparedSpell;
       if (input.checked && !state.preparedSpellIds.includes(id)) {
-        state.preparedSpellIds.push(id);
+        const limit = preparedSpellLimit();
+        if (limit === null || preparedSpellCount() < limit) state.preparedSpellIds.push(id);
       }
       if (!input.checked) {
         state.preparedSpellIds = state.preparedSpellIds.filter((spellId) => spellId !== id);
@@ -953,8 +997,9 @@ function renderAvailableSpell(spell) {
   `;
 }
 
-function renderKnownSpell(spell) {
-  const prepared = state.preparedSpellIds.includes(spell.id);
+function renderKnownSpell(spell, preparedIds = new Set(state.preparedSpellIds), limit = preparedSpellLimit()) {
+  const prepared = preparedIds.has(spell.id);
+  const limitReached = limit !== null && preparedSpellCount() >= limit;
   return `
     <article class="known-spell-row">
       <details class="known-spell-card">
@@ -975,7 +1020,7 @@ function renderKnownSpell(spell) {
       </details>
       <div class="known-spell-actions">
         <label class="prepared-toggle">
-          <input data-prepared-spell="${escapeAttribute(spell.id)}" type="checkbox" ${prepared ? "checked" : ""} />
+          <input data-prepared-spell="${escapeAttribute(spell.id)}" type="checkbox" ${prepared ? "checked" : ""} ${!prepared && limitReached ? "disabled" : ""} />
           <span>Prep.</span>
         </label>
         <button class="small-button remove-spell" data-remove-spell="${escapeAttribute(spell.id)}" type="button">Rimuovi</button>
