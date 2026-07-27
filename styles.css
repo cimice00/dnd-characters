@@ -312,37 +312,16 @@ button {
 }
 
 .sheet-collapse-summary {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, auto) 18px;
-  gap: 8px;
-  align-items: baseline;
-  list-style: none;
-}
-
-.sheet-collapse-summary::-webkit-details-marker {
-  display: none;
+  font-weight: 800;
 }
 
 .sheet-collapse-summary small {
-  text-align: right;
+  float: right;
   text-transform: none;
 }
 
 .sheet-collapse-panel[open] > .sheet-collapse-summary small {
   display: none;
-}
-
-.sheet-collapse-summary::after {
-  content: "▸";
-  color: var(--muted);
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 1;
-  text-align: center;
-}
-
-.sheet-collapse-panel[open] > .sheet-collapse-summary::after {
-  content: "▾";
 }
 
 .hp-row {
