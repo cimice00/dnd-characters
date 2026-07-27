@@ -91,6 +91,8 @@ textarea {
 
 button {
   -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
 }
 
 .app-shell {
@@ -323,11 +325,12 @@ button {
   font-weight: 800;
 }
 
-.step-button:active,
-.icon-button:active,
-.small-button:active,
-.tab-button:active {
-  transform: translateY(1px);
+button:active:not(:disabled),
+button.press-active:not(:disabled) {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--focus-ring), inset 0 1px 10px rgba(255, 255, 255, 0.08);
+  filter: brightness(1.08);
+  transform: translateY(1px) scale(0.98);
 }
 
 .number-field {
@@ -1353,6 +1356,11 @@ summary {
   background: var(--surface);
 }
 
+.compact-field {
+  width: 100%;
+  margin: 0;
+}
+
 .session-card {
   grid-template-columns: 1fr auto;
   align-items: center;
@@ -1589,13 +1597,15 @@ summary {
   background: var(--panel-bg);
 }
 
-#characterSyncBanner[hidden] {
+#characterSyncBanner[hidden]:not(.user-hidden) {
   display: grid !important;
   visibility: hidden;
 }
 
-.sync-banner.user-hidden {
+.sync-banner.user-hidden,
+#characterSyncBanner[hidden].user-hidden {
   display: none !important;
+  visibility: hidden;
 }
 
 .sync-banner span {

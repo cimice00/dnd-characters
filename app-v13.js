@@ -8,7 +8,7 @@
   const CHARACTER_ID_KEY = "dnd-mobile-character-id-v1";
   const MASTER_PREVIEW_KEY = "dnd-master-character-preview-v1";
   const SYNC_BANNER_PREF_KEY = "dnd-character-sync-banner-v1";
-  const APP_VERSION = "1.7.10";
+  const APP_VERSION = "1.7.11";
   const OFFLINE_DB_NAME = "dnd-offline-first-v1";
   const OFFLINE_DB_VERSION = 1;
   const SUPABASE_CDN_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
@@ -162,7 +162,7 @@
     if (!banner) return;
     const hasContent = Boolean(state || detail);
     banner.classList.toggle("user-hidden", hasContent && !isCharacterSyncBannerVisible());
-    banner.hidden = !hasContent || !isCharacterSyncBannerVisible();
+    banner.hidden = !hasContent;
     if (state) setText("#characterSyncState", state);
     if (detail) setText("#characterSyncDetail", detail);
     updateSyncBannerMenuButton();
@@ -829,6 +829,12 @@
     if (viewName !== "master") stopMasterRealtime();
   }
 
+  function hideAppViews() {
+    $$(".app-view").forEach((view) => {
+      view.hidden = true;
+    });
+  }
+
   function openDrawer() {
     $("#drawerBackdrop").hidden = false;
     $("#sideDrawer").hidden = false;
@@ -1001,9 +1007,13 @@
           .map(
             (item) => `
               <article class="admin-row">
-                <strong>${escapeHtml(item.session.name)}</strong>
+                <label class="field compact-field">
+                  <span>Nome campagna</span>
+                  <input data-rename-master-session="${escapeAttribute(item.session.id)}" type="text" value="${escapeAttribute(item.session.name)}" />
+                </label>
                 <small>Master</small>
                 <div class="row-actions">
+                  <button class="small-button" data-save-master-session="${escapeAttribute(item.session.id)}" type="button">Rinomina</button>
                   <button class="small-button danger-button" data-delete-master-session="${item.session.id}" type="button">Elimina</button>
                 </div>
               </article>
@@ -1014,6 +1024,20 @@
 
     list.querySelectorAll("[data-delete-master-session]").forEach((button) => {
       button.addEventListener("click", () => requestDeleteMasterSession(button.dataset.deleteMasterSession));
+    });
+    list.querySelectorAll("[data-save-master-session]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const input = button.closest(".admin-row")?.querySelector("[data-rename-master-session]");
+        renameMasterSession(button.dataset.saveMasterSession, input?.value || "", button);
+      });
+    });
+    list.querySelectorAll("[data-rename-master-session]").forEach((input) => {
+      input.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        const button = input.closest(".admin-row")?.querySelector("[data-save-master-session]");
+        renameMasterSession(input.dataset.renameMasterSession, input.value, button);
+      });
     });
   }
 
@@ -1223,6 +1247,53 @@
     }
     input.value = "";
     await openSession(data.id);
+  }
+
+  async function renameMasterSession(sessionId, name, button) {
+    if (!app.client) {
+      setStatus("Rinomina disponibile solo online");
+      return;
+    }
+    const nextName = String(name || "").trim();
+    if (!nextName) {
+      setStatus("Inserisci un nome campagna");
+      return;
+    }
+
+    let data = null;
+    let error = null;
+    if (button) button.disabled = true;
+    try {
+      const response = await app.client.rpc("app_rename_session", {
+        app_token: app.sessionToken,
+        target_session_id: sessionId,
+        session_name: nextName,
+      });
+      data = response.data;
+      error = response.error;
+    } catch (rpcError) {
+      error = rpcError;
+    } finally {
+      if (button) button.disabled = false;
+    }
+    if (error || !data?.id) {
+      setStatus("Campagna non rinominata");
+      return;
+    }
+
+    app.sessions = normalizeSessionMemberships(
+      app.sessions.map((member) =>
+        member.session?.id === sessionId ? { ...member, session: { ...member.session, ...data } } : member
+      )
+    );
+    if (app.currentSession?.id === sessionId) {
+      app.currentSession = { ...app.currentSession, ...data };
+      setSessionTitle(app.currentSession.name);
+    }
+    await cacheShellData({ profile: app.profile, sessions: app.sessions, invites: app.invites }).catch(() => null);
+    renderSessionList();
+    renderDrawer();
+    setStatus("Campagna rinominata");
   }
 
   async function openSession(sessionId) {
@@ -2267,6 +2338,7 @@
   }
 
   function bindEvents() {
+    bindButtonPressFeedback();
     $("#loginSubmit").addEventListener("click", signIn);
     $("#offlineLocalAccessButton").addEventListener("click", showOfflineLocalAccess);
     $("#loginPassword").addEventListener("keydown", (event) => {
@@ -2305,6 +2377,19 @@
     $("#characterView").addEventListener("click", queueCharacterSave);
   }
 
+  function bindButtonPressFeedback() {
+    document.addEventListener("pointerdown", (event) => {
+      const button = event.target.closest("button");
+      if (!button || button.disabled) return;
+      button.classList.add("press-active");
+      const clear = () => button.classList.remove("press-active");
+      button.addEventListener("pointerup", clear, { once: true });
+      button.addEventListener("pointercancel", clear, { once: true });
+      button.addEventListener("pointerleave", clear, { once: true });
+      window.setTimeout(clear, 220);
+    });
+  }
+
   function debounce(callback, delay) {
     let timer = null;
     return (...args) => {
@@ -2337,7 +2422,11 @@
   async function init() {
     if (!isOfflineLocalAccessActive()) localStorage.removeItem(OFFLINE_PROFILE_ID_KEY);
     bindEvents();
-    showView("auth");
+    if (app.sessionToken) {
+      hideAppViews();
+    } else {
+      showView("auth");
+    }
     registerServiceWorker();
     await openOfflineDb().catch(() => {
       app.offlineReady = false;
