@@ -8,7 +8,7 @@
   const CHARACTER_ID_KEY = "dnd-mobile-character-id-v1";
   const MASTER_PREVIEW_KEY = "dnd-master-character-preview-v1";
   const SYNC_BANNER_PREF_KEY = "dnd-character-sync-banner-v1";
-  const APP_VERSION = "1.7.12";
+  const APP_VERSION = "1.7.13";
   const OFFLINE_DB_NAME = "dnd-offline-first-v1";
   const OFFLINE_DB_VERSION = 1;
   const SUPABASE_CDN_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
@@ -2353,11 +2353,19 @@
             ? "Supporto"
             : "Azione libera";
     const effectLabel = { damage: "Danni", healing: "Cura", condition: "Condizione", custom: "Effetto" }[action.effectType] || "Effetto";
-    const effect = action.effectValue ?? action.damage ?? action.healing ?? action.condition ?? "";
+    const effect = action.effectType === "damage" ? formatPdfDamage(action) : action.effectValue ?? action.damage ?? action.healing ?? action.condition ?? "";
     const detail = action.effectDetail ?? action.conditionDuration ?? "";
     const resource = Array.isArray(resources) ? resources.find((item) => item.id === action.resourceId) : null;
     const cost = resource ? `${resource.name || "Risorsa"} ${Number(resource.current) || 0}/${Number(resource.max) || 0}` : "Sempre";
     return `${valueOrDash(action.name)} | ${activation} | ${resolution} | ${effectLabel} ${valueOrDash(effect)}${detail ? ` (${detail})` : ""} | ${cost}`;
+  }
+
+  function formatPdfDamage(action = {}) {
+    const dice = String(action.damageDice || "").trim();
+    const rawBonus = String(action.damageBonus || "").trim().replace(/\s+/g, "");
+    const bonus = rawBonus && rawBonus !== "0" ? (rawBonus.startsWith("+") || rawBonus.startsWith("-") ? ` ${rawBonus}` : ` + ${rawBonus}`) : "";
+    const type = String(action.damageType || "").trim();
+    return (dice + bonus + (type ? ` ${type}` : "")).trim() || action.effectValue || action.damage || "";
   }
 
   function bindButtonPressFeedback() {

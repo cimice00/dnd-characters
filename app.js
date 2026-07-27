@@ -261,6 +261,17 @@ function normalizeAction(action = {}, index = 0) {
   const resolutionType = ["attack_roll", "saving_throw", "support", "utility"].includes(action.resolutionType)
     ? action.resolutionType
     : "attack_roll";
+  const effectType = ["damage", "healing", "condition", "custom"].includes(action.effectType)
+    ? action.effectType
+    : action.healing
+      ? "healing"
+      : action.condition
+        ? "condition"
+        : action.damage
+          ? "damage"
+          : "custom";
+  const legacyEffect = action.effectValue ?? action.damage ?? action.healing ?? action.condition ?? "";
+  const parsedDamage = effectType === "damage" ? parseDamageFields(legacyEffect) : {};
   return {
     id: action.id || `action-${index}-${slug(action.name)}`,
     name: action.name || "",
@@ -271,21 +282,23 @@ function normalizeAction(action = {}, index = 0) {
     saveAbility: action.saveAbility || "dexterity",
     saveDc: action.saveDc ?? "",
     successOutcome: action.successOutcome || "",
-    effectType: ["damage", "healing", "condition", "custom"].includes(action.effectType)
-      ? action.effectType
-      : action.healing
-        ? "healing"
-        : action.condition
-          ? "condition"
-          : action.damage
-            ? "damage"
-            : "custom",
-    effectValue: action.effectValue ?? action.damage ?? action.healing ?? action.condition ?? "",
+    effectType,
+    effectValue: legacyEffect,
     effectDetail: action.effectDetail ?? action.conditionDuration ?? "",
+    damageDice: action.damageDice ?? parsedDamage.dice ?? "",
+    damageBonus: action.damageBonus ?? parsedDamage.bonus ?? "",
+    damageType: action.damageType ?? parsedDamage.type ?? "",
     resourceId: action.resourceId || "",
     resourceAmount: Math.max(1, Number(action.resourceAmount) || 1),
     notes: action.notes || "",
   };
+}
+
+function parseDamageFields(value) {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^(\d+d\d+)(?:\s*([+-]\s*\d+))?(?:\s+(.+))?$/i);
+  if (!match) return { dice: raw, bonus: "", type: "" };
+  return { dice: match[1], bonus: (match[2] || "").replace(/\s+/g, ""), type: match[3] || "" };
 }
 
 function saveState() {
@@ -508,6 +521,21 @@ function actionAvailabilitySummary(action) {
   return resource ? resource.name + " " + resource.current + "/" + resource.max + " · " + resourceRecoveryLabel(resource) : "Sempre";
 }
 
+function actionDamageSummary(action) {
+  const dice = String(action.damageDice || "").trim();
+  const rawBonus = String(action.damageBonus || "").trim().replace(/\s+/g, "");
+  const bonus = rawBonus && rawBonus !== "0" ? (rawBonus.startsWith("+") || rawBonus.startsWith("-") ? " " + rawBonus : " + " + rawBonus) : "";
+  const type = String(action.damageType || "").trim();
+  return (dice + bonus + (type ? " " + type : "")).trim() || "-";
+}
+
+function actionQuickEffectSummary(action) {
+  if (action.effectType === "damage") return actionDamageSummary(action);
+  if (action.effectType === "healing") return "Cura " + (action.effectValue || "-");
+  if (action.effectType === "condition") return "Condizione " + (action.effectValue || "-");
+  return action.effectValue || "Effetto";
+}
+
 function actionResourceOptions(action) {
   return ['<option value="">Sempre disponibile</option>']
     .concat(
@@ -521,6 +549,21 @@ function actionResourceOptions(action) {
 
 function actionEffectPlaceholder(type) {
   return { damage: "es. 2d6 fuoco", healing: "es. 1d8 + 3 PF", condition: "es. Avvelenato", custom: "Descrivi l'effetto" }[type] || "";
+}
+
+function actionEffectFields(action, index) {
+  const typeSelect = '<label class="field"><span>Effetto</span><select data-action="' + index + '" data-action-field="effectType" data-action-rerender="true">' + optionList(actionEffectLabels, action.effectType) + '</select></label>';
+  if (action.effectType === "damage") {
+    return typeSelect + '<label class="field"><span>Dadi danno</span><input data-action="' + index + '" data-action-field="damageDice" value="' + escapeAttribute(action.damageDice) + '" placeholder="es. 1d8" /></label><label class="field"><span>Bonus ai danni</span><input data-action="' + index + '" data-action-field="damageBonus" value="' + escapeAttribute(action.damageBonus) + '" placeholder="es. +3" /></label><label class="field"><span>Tipo di danno</span><input data-action="' + index + '" data-action-field="damageType" value="' + escapeAttribute(action.damageType) + '" placeholder="es. perforante" /></label>';
+  }
+  const valueField = '<label class="field"><span>' + escapeHtml(actionEffectLabels[action.effectType]) + '</span><input data-action="' + index + '" data-action-field="effectValue" value="' + escapeAttribute(action.effectValue) + '" placeholder="' + escapeAttribute(actionEffectPlaceholder(action.effectType)) + '" /></label>';
+  if (action.effectType === "condition") {
+    return typeSelect + valueField + '<label class="field full-row"><span>Durata</span><input data-action="' + index + '" data-action-field="effectDetail" value="' + escapeAttribute(action.effectDetail) + '" placeholder="es. 1 round" /></label>';
+  }
+  if (action.effectType === "custom") {
+    return typeSelect + valueField + '<label class="field full-row"><span>Dettagli</span><input data-action="' + index + '" data-action-field="effectDetail" value="' + escapeAttribute(action.effectDetail) + '" /></label>';
+  }
+  return typeSelect + valueField;
 }
 
 function renderActions() {
@@ -540,7 +583,7 @@ function renderActions() {
           const costFields = resource
             ? '<label class="field"><span>Consuma</span><input data-action="' + index + '" data-action-field="resourceAmount" type="number" min="1" inputmode="numeric" value="' + escapeAttribute(action.resourceAmount) + '" /></label>'
             : "";
-          return '<details class="action-card" data-action-card="' + index + '"' + (action.id === openActionId ? " open" : "") + '><summary><span>' + escapeHtml(action.name || "Nuova azione") + '</span><small>' + escapeHtml(actionActivationLabels[action.activation]) + " · " + escapeHtml(actionResolutionSummary(action)) + " · " + escapeHtml(actionAvailabilitySummary(action)) + '</small></summary><div class="action-editor"><div class="action-grid"><label class="field full-row"><span>Nome</span><input data-action="' + index + '" data-action-field="name" value="' + escapeAttribute(action.name) + '" /></label><label class="field"><span>Attivazione</span><select data-action="' + index + '" data-action-field="activation" data-action-rerender="true">' + optionList(actionActivationLabels, action.activation) + '</select></label><label class="field"><span>Bersaglio</span><select data-action="' + index + '" data-action-field="target">' + optionList(actionTargetLabels, action.target) + '</select></label><label class="field full-row"><span>Risoluzione</span><select data-action="' + index + '" data-action-field="resolutionType" data-action-rerender="true">' + optionList(actionResolutionLabels, action.resolutionType) + '</select></label>' + resolutionFields + '<label class="field"><span>Effetto</span><select data-action="' + index + '" data-action-field="effectType" data-action-rerender="true">' + optionList(actionEffectLabels, action.effectType) + '</select></label><label class="field"><span>' + escapeHtml(actionEffectLabels[action.effectType]) + '</span><input data-action="' + index + '" data-action-field="effectValue" value="' + escapeAttribute(action.effectValue) + '" placeholder="' + escapeAttribute(actionEffectPlaceholder(action.effectType)) + '" /></label>' + (action.effectType === "condition" ? '<label class="field full-row"><span>Durata</span><input data-action="' + index + '" data-action-field="effectDetail" value="' + escapeAttribute(action.effectDetail) + '" placeholder="es. 1 round" /></label>' : action.effectType === "custom" ? '<label class="field full-row"><span>Dettagli</span><input data-action="' + index + '" data-action-field="effectDetail" value="' + escapeAttribute(action.effectDetail) + '" /></label>' : "") + '<label class="field full-row"><span>Disponibilita</span><select data-action="' + index + '" data-action-field="resourceId" data-action-rerender="true">' + actionResourceOptions(action) + '</select></label>' + costFields + '<label class="field full-row"><span>Note</span><textarea data-action="' + index + '" data-action-field="notes" rows="2">' + escapeHtml(action.notes) + '</textarea></label></div><div class="action-card-footer">' + (resource ? '<button class="small-button" data-use-action="' + index + '" type="button"' + (canUse ? "" : " disabled") + ">Usa (" + action.resourceAmount + ")</button>" : '<small>Sempre disponibile</small>') + '<button class="small-button remove-action" data-remove-action="' + index + '" type="button">Rimuovi</button></div></div></details>';
+          return '<details class="action-card" data-action-card="' + index + '"' + (action.id === openActionId ? " open" : "") + '><summary><span>' + escapeHtml(action.name || "Nuova azione") + '</span><small>' + escapeHtml(actionActivationLabels[action.activation]) + " · " + escapeHtml(actionResolutionSummary(action)) + " · " + escapeHtml(actionQuickEffectSummary(action)) + " · " + escapeHtml(actionAvailabilitySummary(action)) + '</small></summary><div class="action-editor"><div class="action-grid"><label class="field full-row"><span>Nome</span><input data-action="' + index + '" data-action-field="name" value="' + escapeAttribute(action.name) + '" /></label><label class="field"><span>Attivazione</span><select data-action="' + index + '" data-action-field="activation" data-action-rerender="true">' + optionList(actionActivationLabels, action.activation) + '</select></label><label class="field"><span>Bersaglio</span><select data-action="' + index + '" data-action-field="target">' + optionList(actionTargetLabels, action.target) + '</select></label><label class="field full-row"><span>Risoluzione</span><select data-action="' + index + '" data-action-field="resolutionType" data-action-rerender="true">' + optionList(actionResolutionLabels, action.resolutionType) + '</select></label>' + resolutionFields + actionEffectFields(action, index) + '<label class="field full-row"><span>Disponibilita</span><select data-action="' + index + '" data-action-field="resourceId" data-action-rerender="true">' + actionResourceOptions(action) + '</select></label>' + costFields + '<label class="field full-row"><span>Note</span><textarea data-action="' + index + '" data-action-field="notes" rows="2">' + escapeHtml(action.notes) + '</textarea></label></div><div class="action-card-footer">' + (resource ? '<button class="small-button" data-use-action="' + index + '" type="button"' + (canUse ? "" : " disabled") + ">Usa (" + action.resourceAmount + ")</button>" : '<small>Sempre disponibile</small>') + '<button class="small-button remove-action" data-remove-action="' + index + '" type="button">Rimuovi</button></div></div></details>';
         })
         .join("")
     : '<div class="empty-state">Nessuna azione. Aggiungine una per iniziare.</div>';
