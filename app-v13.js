@@ -990,8 +990,6 @@
     if (adminNav) adminNav.hidden = app.profile?.role !== "admin";
     const exportButton = $("#exportCharacterPdfButton");
     if (exportButton) exportButton.hidden = !selectedCharacterId();
-    const prepareButton = $("#prepareOfflineButton");
-    if (prepareButton) prepareButton.hidden = !app.currentSession;
     updateSyncBannerMenuButton();
     renderSettingsMasterSessions();
   }
@@ -1519,41 +1517,6 @@
     if (app.readOnlyCharacter || app.currentRole === "master") return { ok: true, message: "Sola lettura: esportazione senza salvataggio" };
     setStatus("Verifico salvataggio...");
     return saveCharacter({ silent: true });
-  }
-
-  async function prepareOfflineSession() {
-    closeDrawer();
-    if (!app.currentSession) {
-      setStatus("Seleziona prima una sessione");
-      return;
-    }
-    setStatus("Preparo sessione offline...");
-    const profileId = app.user?.id || "";
-    await idbPut("local_sessions", {
-      id: localSessionRecordId(profileId, app.currentSession.id),
-      session_id: app.currentSession.id,
-      role: app.currentRole,
-      session: app.currentSession,
-      profile_id: profileId,
-      cached_at: new Date().toISOString(),
-      prepared_at: new Date().toISOString(),
-    }).catch(() => null);
-
-    if (app.currentRole === "master" || app.profile?.role === "admin") {
-      await loadMasterCharacters(app.currentSession.id);
-      await idbPut("local_meta", { key: `offline_session:${app.currentSession.id}`, value: new Date().toISOString() }).catch(() => null);
-      setStatus(app.masterCharacters.length ? "Sessione master pronta offline" : "Sessione pronta, nessuna scheda locale");
-      return;
-    }
-
-    await saveLocalCharacterSnapshot("pending").catch(() => null);
-    const syncResult = await syncPendingQueue().catch(() => ({ ok: false }));
-    await idbPut("local_meta", { key: `offline_session:${app.currentSession.id}`, value: new Date().toISOString() }).catch(() => null);
-    setCharacterSyncBanner(
-      syncResult.ok ? "Pronta offline" : "Pronta offline",
-      syncResult.ok ? "Scheda locale e database sincronizzati." : "Scheda salvata sul dispositivo, sync in coda."
-    );
-    setStatus(syncResult.ok ? "Sessione pronta offline" : "Sessione pronta offline, DB non raggiunto");
   }
 
   function buildCharacterBackupPdf(characterBackups, options = {}) {
@@ -2355,8 +2318,6 @@
     $("#exportCharacterPdfButton").addEventListener("click", exportCurrentCharacterPdf);
     $("#toggleSyncBannerButton")?.addEventListener("click", toggleCharacterSyncBanner);
     $("#exportSessionPdfButton").addEventListener("click", exportMasterSessionPdf);
-    $("#prepareOfflineButton").addEventListener("click", prepareOfflineSession);
-    $("#prepareOfflineMasterButton").addEventListener("click", prepareOfflineSession);
     $("#cancelDeleteSessionButton").addEventListener("click", closeDeleteSessionConfirm);
     $("#confirmDeleteSessionButton").addEventListener("click", confirmDeleteMasterSession);
     $("#deleteSessionConfirmBackdrop").addEventListener("click", (event) => {
