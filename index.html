@@ -283,11 +283,11 @@
           </label>
         </div>
 
-        <article class="death-panel">
-          <div class="section-title">
+        <details class="death-panel sheet-collapse-panel" open>
+          <summary class="section-title sheet-collapse-summary">
             <span>TS contro Morte</span>
-            <small>successi / fallimenti</small>
-          </div>
+            <small id="deathSaveSummary">0 successi · 0 fallimenti</small>
+          </summary>
           <div class="death-grid">
             <div class="death-track" aria-label="Successi">
               <span>Successi</span>
@@ -302,15 +302,16 @@
               <label><input data-death="failures" value="3" type="checkbox" /><i></i></label>
             </div>
           </div>
-        </article>
+        </details>
       </section>
 
-      <section class="ability-band" aria-label="Caratteristiche">
-        <div class="section-title">
+      <details class="ability-band sheet-collapse-panel" aria-label="Caratteristiche" open>
+        <summary class="section-title sheet-collapse-summary">
           <span>Caratteristiche</span>
-        </div>
+          <small id="abilityQuickSummary"></small>
+        </summary>
         <div class="ability-grid" id="abilityGrid"></div>
-      </section>
+      </details>
 
       <section class="attacks-panel">
         <div class="section-title action-title">

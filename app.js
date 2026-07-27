@@ -422,11 +422,13 @@ function renderAbilities() {
       `;
     })
     .join("");
+  renderAbilityQuickSummary();
 
   grid.querySelectorAll("[data-ability]").forEach((input) => {
     input.addEventListener("input", () => {
       state.abilities[input.dataset.ability] = Number(input.value);
       document.querySelector(`[data-mod="${input.dataset.ability}"]`).textContent = signed(abilityMod(input.value));
+      renderAbilityQuickSummary();
       renderChecks();
       saveState();
     });
@@ -650,6 +652,12 @@ function renderActions() {
       renderActions();
     });
   });
+}
+
+function renderAbilityQuickSummary() {
+  const summary = document.getElementById("abilityQuickSummary");
+  if (!summary) return;
+  summary.textContent = abilities.map(([key, label]) => `${label} ${signed(abilityMod(state.abilities[key]))}`).join(" · ");
 }
 
 function escapeAttribute(value) {
@@ -1276,6 +1284,8 @@ function updateDeathTrack(type, count) {
   document.querySelectorAll(`[data-death="${type}"]`).forEach((box) => {
     box.checked = Number(box.value) <= safeCount;
   });
+  const summary = document.getElementById("deathSaveSummary");
+  if (summary) summary.textContent = `${Number(state.deathSuccesses) || 0} successi · ${Number(state.deathFailures) || 0} fallimenti`;
 }
 
 function bindActions() {
