@@ -8,7 +8,7 @@
   const CHARACTER_ID_KEY = "dnd-mobile-character-id-v1";
   const MASTER_PREVIEW_KEY = "dnd-master-character-preview-v1";
   const SYNC_BANNER_PREF_KEY = "dnd-character-sync-banner-v1";
-  const APP_VERSION = "1.7.23";
+  const APP_VERSION = "1.7.24";
   const OFFLINE_DB_NAME = "dnd-offline-first-v1";
   const OFFLINE_DB_VERSION = 1;
   const SUPABASE_CDN_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";

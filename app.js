@@ -1,5 +1,7 @@
 const STORAGE_KEY = "dnd-mobile-character-v1";
 const THEME_KEY = "dnd-mobile-theme-v1";
+const CHARACTER_UI_STATE_KEY = "dnd-mobile-character-ui-v1";
+const SELECTED_CHARACTER_ID_KEY = "dnd-mobile-character-id-v1";
 
 const classLabelsIt = {
   Artificer: "Artefice",
@@ -312,6 +314,75 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+function characterUiScope() {
+  const characterId = sessionStorage.getItem(SELECTED_CHARACTER_ID_KEY) || localStorage.getItem(SELECTED_CHARACTER_ID_KEY);
+  return characterId || `local:${state.activeSessionId || "default"}`;
+}
+
+function uiStateStore() {
+  try {
+    return JSON.parse(localStorage.getItem(CHARACTER_UI_STATE_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function characterUiState() {
+  return uiStateStore()[characterUiScope()] || {};
+}
+
+function updateCharacterUiState(patch) {
+  const store = uiStateStore();
+  const scope = characterUiScope();
+  store[scope] = { ...(store[scope] || {}), ...patch };
+  localStorage.setItem(CHARACTER_UI_STATE_KEY, JSON.stringify(store));
+}
+
+function storedPanelState(panelId) {
+  const value = characterUiState().panels?.[panelId];
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function isPanelOpen(panelId, defaultOpen = false) {
+  return storedPanelState(panelId) ?? defaultOpen;
+}
+
+function savePanelState(panelId, open) {
+  const uiState = characterUiState();
+  updateCharacterUiState({ panels: { ...(uiState.panels || {}), [panelId]: Boolean(open) } });
+}
+
+function clearPanelStates(prefix) {
+  const uiState = characterUiState();
+  const panels = Object.fromEntries(Object.entries(uiState.panels || {}).filter(([panelId]) => !panelId.startsWith(prefix)));
+  updateCharacterUiState({ panels });
+}
+
+function bindPersistentDetails(root = document) {
+  root.querySelectorAll("details[data-ui-panel]").forEach((panel) => {
+    const savedOpen = storedPanelState(panel.dataset.uiPanel);
+    panel.open = savedOpen ?? (panel.dataset.uiDefaultOpen === "true" || panel.open);
+    if (panel.dataset.uiPersistenceBound === "true") return;
+    panel.dataset.uiPersistenceBound = "true";
+    panel.addEventListener("toggle", () => savePanelState(panel.dataset.uiPanel, panel.open));
+  });
+}
+
+function activateCharacterTab(tabId, persist = false) {
+  const button = document.querySelector(`.tab-button[data-tab="${tabId}"]`);
+  const panel = document.getElementById(tabId);
+  if (!button || !panel) return false;
+  document.querySelectorAll(".tab-button").forEach((tab) => tab.classList.toggle("active", tab === button));
+  document.querySelectorAll(".tab-panel").forEach((item) => item.classList.toggle("active", item === panel));
+  if (persist) updateCharacterUiState({ activeTab: tabId });
+  return true;
+}
+
+function restoreCharacterUiState() {
+  bindPersistentDetails(document.getElementById("characterView"));
+  if (!activateCharacterTab(characterUiState().activeTab || "skills")) activateCharacterTab("skills");
+}
+
 function signed(value) {
   const number = Number(value) || 0;
   return number >= 0 ? `+${number}` : `${number}`;
@@ -618,10 +689,13 @@ function renderActions() {
           const costFields = resource
             ? '<label class="field"><span>Consuma</span><input data-action="' + index + '" data-action-field="resourceAmount" type="number" min="1" inputmode="numeric" value="' + escapeAttribute(action.resourceAmount) + '" /></label>'
             : "";
-          return '<details class="action-card" data-action-card="' + index + '"' + (action.id === openActionId ? " open" : "") + '><summary><span data-action-name="' + index + '">' + escapeHtml(action.name || "Nuova azione") + '</span><small data-action-summary="' + index + '">' + escapeHtml(actionQuickSummary(action)) + '</small></summary><div class="action-editor"><div class="action-grid"><label class="field full-row"><span>Nome</span><input data-action="' + index + '" data-action-field="name" value="' + escapeAttribute(action.name) + '" /></label><label class="field"><span>Attivazione</span><select data-action="' + index + '" data-action-field="activation" data-action-rerender="true">' + optionList(actionActivationLabels, action.activation) + '</select></label><label class="field"><span>Bersaglio</span><select data-action="' + index + '" data-action-field="target">' + optionList(actionTargetLabels, action.target) + '</select></label><label class="field full-row"><span>Risoluzione</span><select data-action="' + index + '" data-action-field="resolutionType" data-action-rerender="true">' + optionList(actionResolutionLabels, action.resolutionType) + '</select></label>' + resolutionFields + actionEffectFields(action, index) + '<label class="field full-row"><span>Disponibilita</span><select data-action="' + index + '" data-action-field="resourceId" data-action-rerender="true">' + actionResourceOptions(action) + '</select></label>' + costFields + '<label class="field full-row"><span>Note</span><textarea data-action="' + index + '" data-action-field="notes" rows="2">' + escapeHtml(action.notes) + '</textarea></label></div><div class="action-card-footer">' + (resource ? '<button class="small-button" data-use-action="' + index + '" type="button"' + (canUse ? "" : " disabled") + ">Usa (" + action.resourceAmount + ")</button>" : "") + '<button class="small-button remove-action" data-remove-action="' + index + '" type="button">Rimuovi</button></div></div></details>';
+          const panelId = `action:${action.id}`;
+          return '<details class="action-card" data-action-card="' + index + '" data-ui-panel="' + escapeAttribute(panelId) + '"' + (action.id === openActionId || isPanelOpen(panelId) ? " open" : "") + '><summary><span data-action-name="' + index + '">' + escapeHtml(action.name || "Nuova azione") + '</span><small data-action-summary="' + index + '">' + escapeHtml(actionQuickSummary(action)) + '</small></summary><div class="action-editor"><div class="action-grid"><label class="field full-row"><span>Nome</span><input data-action="' + index + '" data-action-field="name" value="' + escapeAttribute(action.name) + '" /></label><label class="field"><span>Attivazione</span><select data-action="' + index + '" data-action-field="activation" data-action-rerender="true">' + optionList(actionActivationLabels, action.activation) + '</select></label><label class="field"><span>Bersaglio</span><select data-action="' + index + '" data-action-field="target">' + optionList(actionTargetLabels, action.target) + '</select></label><label class="field full-row"><span>Risoluzione</span><select data-action="' + index + '" data-action-field="resolutionType" data-action-rerender="true">' + optionList(actionResolutionLabels, action.resolutionType) + '</select></label>' + resolutionFields + actionEffectFields(action, index) + '<label class="field full-row"><span>Disponibilita</span><select data-action="' + index + '" data-action-field="resourceId" data-action-rerender="true">' + actionResourceOptions(action) + '</select></label>' + costFields + '<label class="field full-row"><span>Note</span><textarea data-action="' + index + '" data-action-field="notes" rows="2">' + escapeHtml(action.notes) + '</textarea></label></div><div class="action-card-footer">' + (resource ? '<button class="small-button" data-use-action="' + index + '" type="button"' + (canUse ? "" : " disabled") + ">Usa (" + action.resourceAmount + ")</button>" : "") + '<button class="small-button remove-action" data-remove-action="' + index + '" type="button">Rimuovi</button></div></div></details>';
         })
         .join("")
     : '<div class="empty-state">Nessuna azione. Aggiungine una per iniziare.</div>';
+
+  bindPersistentDetails(list);
 
   list.querySelectorAll("[data-action-card]").forEach((card) => {
     card.addEventListener("toggle", () => {
@@ -660,6 +734,7 @@ function renderActions() {
       const action = state.actions[Number(button.dataset.removeAction)];
       state.actions.splice(Number(button.dataset.removeAction), 1);
       if (openActionId === action?.id) openActionId = null;
+      if (action?.id) savePanelState(`action:${action.id}`, false);
       saveState();
       renderActions();
     });
@@ -903,6 +978,7 @@ function renderSpellPicker() {
       </div>
     `
     : `<div class="empty-state">Nessun incantesimo aggiunto.</div>`;
+  bindPersistentDetails(knownList);
 
   const filtered = spells.filter((spell) => {
     if (knownIds.has(spell.id)) return false;
@@ -1003,7 +1079,7 @@ function renderKnownSpell(spell, preparedIds = new Set(state.preparedSpellIds), 
   const limitReached = limit !== null && preparedSpellCount() >= limit;
   return `
     <article class="known-spell-row">
-      <details class="known-spell-card">
+      <details class="known-spell-card" data-ui-panel="spell:${escapeAttribute(spell.id)}" ${isPanelOpen(`spell:${spell.id}`) ? "open" : ""}>
         <summary>
           <span>${escapeHtml(spell.name_it || spell.name)}</span>
           <small>${escapeHtml(spell.level_it)} · ${escapeHtml(spell.source)}</small>
@@ -1318,7 +1394,8 @@ function renderEquipment() {
   const list = document.getElementById("equipmentList");
   list.innerHTML = state.equipmentItems
     .map((item, index) => {
-      const isOpen = index === openEquipmentIndex;
+      const panelId = `equipment:${index}`;
+      const isOpen = index === openEquipmentIndex || isPanelOpen(panelId);
       return `
         <article class="equipment-item ${isOpen ? "open" : ""}">
           <button class="equipment-toggle" data-equipment-toggle="${index}" type="button" aria-expanded="${isOpen}">
@@ -1344,7 +1421,10 @@ function renderEquipment() {
   list.querySelectorAll("[data-equipment-toggle]").forEach((button) => {
     button.addEventListener("click", () => {
       const index = Number(button.dataset.equipmentToggle);
-      openEquipmentIndex = openEquipmentIndex === index ? null : index;
+      const nextOpen = button.getAttribute("aria-expanded") !== "true";
+      clearPanelStates("equipment:");
+      if (nextOpen) savePanelState(`equipment:${index}`, true);
+      openEquipmentIndex = nextOpen ? index : null;
       renderEquipment();
     });
   });
@@ -1366,6 +1446,7 @@ function renderEquipment() {
       const index = Number(button.dataset.removeEquipment);
       state.equipmentItems.splice(index, 1);
       openEquipmentIndex = null;
+      clearPanelStates("equipment:");
       state.equipment = state.equipmentItems.map((item) => item.name).filter(Boolean).join(", ");
       renderEquipment();
       saveState();
@@ -1413,6 +1494,8 @@ function bindActions() {
   document.getElementById("addEquipmentButton").addEventListener("click", () => {
     state.equipmentItems.push({ name: "Nuovo oggetto", description: "" });
     openEquipmentIndex = state.equipmentItems.length - 1;
+    clearPanelStates("equipment:");
+    savePanelState(`equipment:${openEquipmentIndex}`, true);
     state.equipment = state.equipmentItems.map((item) => item.name).filter(Boolean).join(", ");
     renderEquipment();
     saveState();
@@ -1453,18 +1536,14 @@ function bindActions() {
     );
     state.actions.push(action);
     openActionId = action.id;
+    savePanelState(`action:${action.id}`, true);
     renderActions();
     saveState();
   });
   document.getElementById("themeButton").addEventListener("click", toggleTheme);
 
   document.querySelectorAll(".tab-button").forEach((button) => {
-    button.addEventListener("click", () => {
-      document.querySelectorAll(".tab-button").forEach((tab) => tab.classList.remove("active"));
-      document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.remove("active"));
-      button.classList.add("active");
-      document.getElementById(button.dataset.tab).classList.add("active");
-    });
+    button.addEventListener("click", () => activateCharacterTab(button.dataset.tab, true));
   });
 }
 
@@ -1506,6 +1585,7 @@ function init() {
   bindSpellFilters();
   bindCustomSpellForm();
   bindCustomConditionForm();
+  restoreCharacterUiState();
 }
 
 init();

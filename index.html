@@ -281,7 +281,7 @@
           </label>
         </div>
 
-        <details class="death-panel sheet-collapse-panel" open>
+        <details class="death-panel sheet-collapse-panel" data-ui-panel="death-saves" data-ui-default-open="true" open>
           <summary class="sheet-collapse-summary">
             <span>TS contro Morte</span>
             <small id="deathSaveSummary">0 successi · 0 fallimenti</small>
@@ -303,7 +303,7 @@
         </details>
       </section>
 
-      <details class="ability-band sheet-collapse-panel" aria-label="Caratteristiche" open>
+      <details class="ability-band sheet-collapse-panel" data-ui-panel="abilities" data-ui-default-open="true" aria-label="Caratteristiche" open>
         <summary class="sheet-collapse-summary">
           <span>Caratteristiche</span>
           <small id="abilityQuickSummary"></small>
@@ -348,12 +348,12 @@
           </label>
         </div>
 
-        <details open>
+        <details data-ui-panel="saving-throws" data-ui-default-open="true" open>
           <summary>Tiri salvezza</summary>
           <div class="check-list" id="saveList"></div>
         </details>
 
-        <details open>
+        <details data-ui-panel="skills" data-ui-default-open="true" open>
           <summary>Abilità</summary>
           <div class="check-list skills-list" id="skillList"></div>
         </details>
@@ -401,7 +401,7 @@
         </div>
         <div class="slots-grid" id="slotsGrid"></div>
         <div class="known-spells" id="knownSpellList"></div>
-        <details class="spell-manager">
+        <details class="spell-manager" data-ui-panel="spell-manager">
           <summary>
             <span>Aggiungi / gestisci incantesimi</span>
             <small id="spellResultCount">0 disponibili</small>
@@ -426,7 +426,7 @@
               </label>
             </div>
             <div class="spell-list" id="spellList"></div>
-            <details class="custom-spell-manager">
+            <details class="custom-spell-manager" data-ui-panel="custom-spell-manager">
               <summary>
                 <span>Incantesimo custom</span>
                 <small>Database locale</small>
