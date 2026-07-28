@@ -368,8 +368,9 @@
         </label>
       </section>
 
-      <section class="tab-panel" id="magic">
-        <div class="spell-summary">
+      <section class="tab-panel magic-tab-panel" id="magic">
+        <section class="magic-panel slot-panel">
+          <div class="spell-summary">
           <label class="number-field">
             <span>CD inc.</span>
             <input data-field="spellDc" type="number" inputmode="numeric" />
@@ -385,23 +386,30 @@
               <input data-field="preparedSpellLimit" type="number" min="0" inputmode="numeric" aria-label="Numero massimo di incantesimi preparabili" placeholder="Max" />
             </div>
           </label>
-        </div>
-        <div class="slot-manager-head">
+          </div>
+          <div class="slot-manager-head">
+            <div class="section-title">
+              <span>Slot incantesimo</span>
+              <button class="small-button" id="slotEditButton" type="button">Modifica slot</button>
+            </div>
+            <div class="slot-add-row" id="slotAddRow" hidden>
+              <label class="field">
+                <span>Livello</span>
+                <select id="slotLevelToAdd"></select>
+              </label>
+              <button class="small-button" id="addSlotButton" type="button">Aggiungi</button>
+            </div>
+          </div>
+          <div class="slots-grid" id="slotsGrid"></div>
+        </section>
+
+        <section class="magic-panel character-spells-panel">
           <div class="section-title">
-            <span>Slot incantesimo</span>
-            <small>RIM / MAX</small>
+            <span>Incantesimi del personaggio</span>
+            <small>Lista e gestione</small>
           </div>
-          <div class="slot-add-row">
-            <label class="field">
-              <span>Livello</span>
-              <select id="slotLevelToAdd"></select>
-            </label>
-            <button class="small-button" id="addSlotButton" type="button">Aggiungi</button>
-          </div>
-        </div>
-        <div class="slots-grid" id="slotsGrid"></div>
-        <div class="known-spells" id="knownSpellList"></div>
-        <details class="spell-manager" data-ui-panel="spell-manager">
+          <div class="known-spells" id="knownSpellList"></div>
+          <details class="spell-manager" data-ui-panel="spell-manager">
           <summary>
             <span>Aggiungi / gestisci incantesimi</span>
             <small id="spellResultCount">0 disponibili</small>
@@ -478,7 +486,8 @@
               <datalist id="customSpellLevelOptions"></datalist>
             </details>
           </section>
-        </details>
+          </details>
+        </section>
       </section>
 
       <section class="tab-panel" id="conditions">

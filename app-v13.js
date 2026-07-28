@@ -8,7 +8,7 @@
   const CHARACTER_ID_KEY = "dnd-mobile-character-id-v1";
   const MASTER_PREVIEW_KEY = "dnd-master-character-preview-v1";
   const SYNC_BANNER_PREF_KEY = "dnd-character-sync-banner-v1";
-  const APP_VERSION = "1.7.24";
+  const APP_VERSION = "1.7.25";
   const OFFLINE_DB_NAME = "dnd-offline-first-v1";
   const OFFLINE_DB_VERSION = 1;
   const SUPABASE_CDN_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
@@ -1979,11 +1979,11 @@
     if (!view) return;
     view.classList.toggle("read-only-sheet", app.readOnlyCharacter);
     view.querySelectorAll("input, textarea, select").forEach((field) => {
-      field.disabled = app.readOnlyCharacter;
+      setReadOnlyDisabled(field, app.readOnlyCharacter);
     });
     view.querySelectorAll("button").forEach((button) => {
       if (button.id === "menuButton" || button.classList.contains("tab-button")) return;
-      button.disabled = app.readOnlyCharacter;
+      setReadOnlyDisabled(button, app.readOnlyCharacter);
     });
 
     let notice = $("#readOnlySheetNotice");
@@ -2343,6 +2343,19 @@
     $("#characterView").addEventListener("input", queueCharacterSave, true);
     $("#characterView").addEventListener("change", queueCharacterSave, true);
     $("#characterView").addEventListener("click", queueCharacterSave);
+  }
+
+  function setReadOnlyDisabled(control, readOnly) {
+    if (readOnly) {
+      if (control.dataset.readOnlyWasDisabled === undefined) {
+        control.dataset.readOnlyWasDisabled = control.disabled ? "true" : "false";
+      }
+      control.disabled = true;
+      return;
+    }
+    if (control.dataset.readOnlyWasDisabled === undefined) return;
+    control.disabled = control.dataset.readOnlyWasDisabled === "true";
+    delete control.dataset.readOnlyWasDisabled;
   }
 
   function formatPdfAction(action = {}, resources = []) {

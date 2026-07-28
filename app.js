@@ -187,6 +187,7 @@ let state = loadState();
 let openEquipmentIndex = null;
 let openActionId = null;
 let pendingResourceRemovalId = "";
+let slotEditMode = false;
 
 function loadState() {
   try {
@@ -765,8 +766,15 @@ function escapeHtml(value) {
 function renderSlots() {
   const grid = document.getElementById("slotsGrid");
   const levelSelect = document.getElementById("slotLevelToAdd");
+  const addRow = document.getElementById("slotAddRow");
+  const editButton = document.getElementById("slotEditButton");
   const slots = Array.isArray(state.slots) ? state.slots : [];
   slots.sort((a, b) => Number(a.level) - Number(b.level));
+  slots.forEach(clampSlot);
+  addRow.hidden = !slotEditMode;
+  editButton.textContent = slotEditMode ? "Salva" : "Modifica slot";
+  editButton.setAttribute("aria-pressed", slotEditMode ? "true" : "false");
+  grid.classList.toggle("is-editing", slotEditMode);
   if (levelSelect) {
     const usedLevels = new Set(slots.map((slot) => Number(slot.level)));
     const options = Array.from({ length: 9 }, (_, index) => index + 1).filter((level) => !usedLevels.has(level));
@@ -776,29 +784,34 @@ function renderSlots() {
     levelSelect.disabled = !options.length;
   }
   grid.innerHTML = slots.length
-    ? slots
-        .map(
-          (slot, index) => `
-            <article class="slot-card">
-              <span>Liv. ${slot.level}</span>
-              <label>
-                <small>RIM</small>
-                <input data-slot="${index}" data-slot-field="current" type="number" inputmode="numeric" value="${slot.current}" aria-label="Slot livello ${slot.level} rimasti" />
-              </label>
-              <label>
-                <small>MAX</small>
-                <input data-slot="${index}" data-slot-field="max" type="number" inputmode="numeric" value="${slot.max}" aria-label="Slot livello ${slot.level} massimi" />
-              </label>
-              <button class="small-button remove-slot" data-remove-slot="${index}" type="button">Rimuovi</button>
-            </article>
-          `
-        )
-        .join("")
-    : `<div class="empty-state">Nessuno slot. Aggiungi solo i livelli disponibili per il personaggio.</div>`;
+    ? slots.map((slot, index) => slotEditMode ? renderSlotEditor(slot, index) : renderSlotCounter(slot, index)).join("")
+    : `<div class="empty-state">Nessuno slot. ${slotEditMode ? "Aggiungi i livelli disponibili per il personaggio." : "Usa Modifica slot per configurarli."}</div>`;
 
   grid.querySelectorAll("[data-slot]").forEach((input) => {
     input.addEventListener("input", () => {
-      state.slots[Number(input.dataset.slot)][input.dataset.slotField] = Number(input.value);
+      const slot = state.slots[Number(input.dataset.slot)];
+      const value = Math.max(0, Number(input.value) || 0);
+      if (input.dataset.slotField === "current") {
+        slot.current = value;
+        slot.max = Math.max(Number(slot.max) || 0, slot.current);
+      } else {
+        slot.max = value;
+        slot.current = Math.min(Math.max(0, Number(slot.current) || 0), slot.max);
+      }
+      const card = input.closest(".slot-card");
+      card.querySelector('[data-slot-field="current"]').value = slot.current;
+      card.querySelector('[data-slot-field="max"]').value = slot.max;
+      saveState();
+    });
+  });
+
+  grid.querySelectorAll("[data-slot-step]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const slot = state.slots[Number(button.dataset.slotStep)];
+      if (!slot) return;
+      clampSlot(slot);
+      slot.current = Math.min(slot.max, Math.max(0, slot.current + Number(button.dataset.step)));
+      syncSlotCounter(button.closest(".slot-counter-row"), slot);
       saveState();
     });
   });
@@ -810,6 +823,51 @@ function renderSlots() {
       saveState();
     });
   });
+}
+
+function clampSlot(slot) {
+  slot.max = Math.max(0, Number(slot.max) || 0);
+  slot.current = Math.min(slot.max, Math.max(0, Number(slot.current) || 0));
+}
+
+function renderSlotCounter(slot, index) {
+  return `
+    <article class="slot-counter-row">
+      <strong>Liv. ${slot.level}</strong>
+      <button class="slot-step" data-slot-step="${index}" data-step="-1" type="button" aria-label="Usa uno slot di livello ${slot.level}" ${slot.current <= 0 ? "disabled" : ""}>−</button>
+      <output class="slot-count" aria-live="polite" aria-label="${slot.current} slot su ${slot.max} al livello ${slot.level}">
+        <strong data-slot-current>${slot.current}</strong><span>/</span><small data-slot-maximum>${slot.max}</small>
+      </output>
+      <button class="slot-step" data-slot-step="${index}" data-step="1" type="button" aria-label="Recupera uno slot di livello ${slot.level}" ${slot.current >= slot.max ? "disabled" : ""}>+</button>
+    </article>
+  `;
+}
+
+function renderSlotEditor(slot, index) {
+  return `
+    <article class="slot-card">
+      <span>Liv. ${slot.level}</span>
+      <label>
+        <small>RIM</small>
+        <input data-slot="${index}" data-slot-field="current" type="number" min="0" inputmode="numeric" value="${slot.current}" aria-label="Slot livello ${slot.level} rimasti" />
+      </label>
+      <label>
+        <small>MAX</small>
+        <input data-slot="${index}" data-slot-field="max" type="number" min="0" inputmode="numeric" value="${slot.max}" aria-label="Slot livello ${slot.level} massimi" />
+      </label>
+      <button class="small-button remove-slot" data-remove-slot="${index}" type="button">Rimuovi</button>
+    </article>
+  `;
+}
+
+function syncSlotCounter(row, slot) {
+  if (!row) return;
+  row.querySelector("[data-slot-current]").textContent = slot.current;
+  row.querySelector("[data-slot-maximum]").textContent = slot.max;
+  const output = row.querySelector(".slot-count");
+  output.setAttribute("aria-label", `${slot.current} slot su ${slot.max} al livello ${slot.level}`);
+  row.querySelector('[data-step="-1"]').disabled = slot.current <= 0;
+  row.querySelector('[data-step="1"]').disabled = slot.current >= slot.max;
 }
 
 function spellDatabase() {
@@ -969,10 +1027,6 @@ function renderSpellPicker() {
     .map(({ spell }) => spell);
   knownList.innerHTML = knownSpells.length
     ? `
-      <div class="section-title compact-title">
-        <span>Incantesimi del personaggio</span>
-        <small>${knownSpells.length}</small>
-      </div>
       <div class="known-spell-list">
         ${knownSpells.map((spell) => renderKnownSpell(spell, preparedIds, preparedSpellLimit())).join("")}
       </div>
@@ -1521,6 +1575,11 @@ function bindActions() {
     state.slots.push({ level, current: 0, max: 0 });
     renderSlots();
     saveState();
+  });
+  document.getElementById("slotEditButton").addEventListener("click", () => {
+    slotEditMode = !slotEditMode;
+    renderSlots();
+    if (!slotEditMode) saveState();
   });
   document.getElementById("addActionButton").addEventListener("click", () => {
     const type = document.getElementById("actionTypeToAdd")?.value || "attack_roll";
