@@ -1916,6 +1916,22 @@ summary {
   }
 }
 
+@media (max-width: 600px) {
+  #characterView:not([hidden]) ~ .floating-theme-button {
+    display: none;
+  }
+
+  .resource-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .resource-row label:first-child,
+  .resource-row label:nth-child(4),
+  .remove-resource {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 380px) {
   .hero-name input {
     font-size: 24px;
@@ -1930,12 +1946,14 @@ summary {
   }
 
   .action-title {
+    flex-direction: column;
     align-items: start;
   }
 
   .action-add-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     width: 100%;
-    justify-content: space-between;
   }
 
   .action-add-row select {
@@ -1943,14 +1961,7 @@ summary {
     max-width: none;
   }
 
-  .action-grid,
-  .resource-row {
+  .action-grid {
     grid-template-columns: 1fr 1fr;
-  }
-
-  .resource-row label:first-child,
-  .resource-row label:nth-child(4),
-  .remove-resource {
-    grid-column: 1 / -1;
   }
 }

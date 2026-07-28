@@ -1,7 +1,7 @@
 {
   "name": "Compendio Personaggi D&D",
   "short_name": "DnD Sheet",
-  "version": "1.7.20",
+  "version": "1.7.21",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

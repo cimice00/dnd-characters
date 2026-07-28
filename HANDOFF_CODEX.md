@@ -7,8 +7,8 @@ Questo file serve per riprendere il lavoro su un'altra macchina senza perdere co
 - Repository locale: `C:\Users\claudio.giglio\Documents\DnD Characters`
 - Branch attuale al momento dell'handoff: `main`
 - App statica frontend, senza framework.
-- Versione reale del codice: `1.7.20` per la PWA/offline-first.
-- `README.md`, `VERSION`, `manifest.webmanifest`, `manifest.json`, `sw.js` e `app-v13.js` sono allineati a `1.7.20`.
+- Versione reale del codice: `1.7.21` per la PWA/offline-first.
+- `README.md`, `VERSION`, `manifest.webmanifest`, `manifest.json`, `sw.js` e `app-v13.js` sono allineati a `1.7.21`.
 - Le ultime modifiche PWA/offline e banner sync non richiedono migrazioni database.
 
 ## File principali
@@ -33,10 +33,11 @@ Questo file serve per riprendere il lavoro su un'altra macchina senza perdere co
 - La versione `1.7.18` usa una freccia per i pannelli collassabili e mostra i riepiloghi rapidi solo quando sono chiusi.
 - La versione `1.7.19` aggiunge il limite di incantesimi preparati e ordina in cima quelli selezionati come preparati.
 - La versione `1.7.20` allinea i marker dei pannelli collassabili a quelli nativi delle sezioni Abilita e Tiri salvezza.
+- La versione `1.7.21` ottimizza la scheda per telefono: il nome delle risorse usa tutta la riga, i campi numerici si dispongono su due colonne e l'intestazione Azioni resta leggibile anche a 320 px.
 - `supabase-config.js`: configurazione runtime Supabase. In locale ora e' vuota/placeholder.
 - `scripts/build-config.mjs`: genera `supabase-config.js` da variabili ambiente.
 - `sw.js`: service worker PWA.
-- `manifest.webmanifest`: manifest PWA aggiornato a `1.7.20`.
+- `manifest.webmanifest`: manifest PWA aggiornato a `1.7.21`.
 - `offline.html`: fallback pagina offline.
 - `pwa-icon.svg`: icona PWA.
 - `supabase/`: schema e migrazioni SQL.
@@ -90,7 +91,7 @@ Implementazione attuale:
 
 Fix importante gia applicata:
 
-- `sw.js` e' passato a cache `dnd-pwa-v1.7.20`;
+- `sw.js` e' passato a cache `dnd-pwa-v1.7.21`;
 - `offline.html` viene restituito solo per navigazioni, mai come fallback per `.js` o `.css`;
 - lo script Supabase CDN non e' piu caricato direttamente in `index.html`;
 - `app-v13.js` carica Supabase dinamicamente solo se serve e se c'e' rete.

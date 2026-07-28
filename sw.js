@@ -1,4 +1,4 @@
-const CACHE_VERSION = "dnd-pwa-v1.7.20";
+const CACHE_VERSION = "dnd-pwa-v1.7.21";
 const APP_SHELL = [
   "./index.html",
   "./offline.html",
