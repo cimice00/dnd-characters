@@ -589,8 +589,43 @@ button.press-active:not(:disabled) {
   grid-column: 1 / -1;
 }
 
+.action-readonly-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.action-readonly-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--field-bg);
+}
+
+.action-readonly-field.full-row {
+  grid-column: 1 / -1;
+}
+
+.action-readonly-field span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.action-readonly-field strong {
+  min-width: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .action-card-footer {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
@@ -602,7 +637,9 @@ button.press-active:not(:disabled) {
   font-weight: 700;
 }
 
-.remove-action {
+.action-card-controls {
+  display: flex;
+  gap: 8px;
   margin-left: auto;
 }
 

@@ -571,6 +571,7 @@
         <button class="drawer-nav-button" data-nav-target="sessions" type="button">Sessioni</button>
         <button class="drawer-nav-button" id="exportCharacterPdfButton" type="button" hidden>Scarica PDF scheda</button>
         <button class="drawer-nav-button" id="toggleSyncBannerButton" type="button" hidden>Nascondi stato scheda</button>
+        <button class="drawer-nav-button" id="drawerThemeButton" type="button">Passa al tema chiaro</button>
         <button class="drawer-nav-button" data-nav-target="settings" type="button">Impostazioni</button>
         <button class="drawer-nav-button" data-nav-target="admin" id="adminNavButton" type="button" hidden>Amministrazione</button>
       </section>
@@ -590,16 +591,16 @@
       </section>
     </aside>
 
-    <aside class="confirm-backdrop" id="deleteResourceConfirmBackdrop" hidden>
-      <section class="confirm-banner" role="dialog" aria-modal="true" aria-labelledby="deleteResourceConfirmTitle" aria-describedby="deleteResourceConfirmText">
+    <aside class="confirm-backdrop" id="deleteItemConfirmBackdrop" hidden>
+      <section class="confirm-banner" role="dialog" aria-modal="true" aria-labelledby="deleteItemConfirmTitle" aria-describedby="deleteItemConfirmText">
         <div>
           <span>Conferma eliminazione</span>
-          <strong id="deleteResourceConfirmTitle">Eliminare questa risorsa?</strong>
-          <p id="deleteResourceConfirmText">Questa azione non può essere annullata.</p>
+          <strong id="deleteItemConfirmTitle">Rimuovere questo elemento?</strong>
+          <p id="deleteItemConfirmText">Questa azione non può essere annullata.</p>
         </div>
         <div class="confirm-actions">
-          <button class="small-button" id="cancelDeleteResourceButton" type="button">Annulla</button>
-          <button class="small-button danger-button" id="confirmDeleteResourceButton" type="button">Elimina risorsa</button>
+          <button class="small-button" id="cancelDeleteItemButton" type="button">Annulla</button>
+          <button class="small-button danger-button" id="confirmDeleteItemButton" type="button">Rimuovi</button>
         </div>
       </section>
     </aside>

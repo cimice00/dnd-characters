@@ -186,8 +186,9 @@ const defaultState = {
 let state = loadState();
 let openEquipmentIndex = null;
 let openActionId = null;
-let pendingResourceRemovalId = "";
 let slotEditMode = false;
+let pendingRemovalAction = null;
+const editingActionIds = new Set();
 
 function loadState() {
   try {
@@ -673,6 +674,52 @@ function actionEffectFields(action, index) {
   return typeSelect + valueField;
 }
 
+function actionReadOnlyField(label, value, fullRow = false) {
+  return `<div class="action-readonly-field ${fullRow ? "full-row" : ""}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || "—")}</strong></div>`;
+}
+
+function renderActionReadOnly(action, resource) {
+  const fields = [
+    actionReadOnlyField("Nome", action.name || "Nuova azione", true),
+    actionReadOnlyField("Attivazione", actionActivationLabels[action.activation]),
+    actionReadOnlyField("Bersaglio", actionTargetLabels[action.target]),
+    actionReadOnlyField("Risoluzione", actionResolutionLabels[action.resolutionType], true),
+  ];
+  if (action.resolutionType === "attack_roll") {
+    fields.push(actionReadOnlyField("Bonus al tiro", action.attackBonus));
+  } else if (action.resolutionType === "saving_throw") {
+    fields.push(actionReadOnlyField("Tiro salvezza", abilityLabel(action.saveAbility)));
+    fields.push(actionReadOnlyField("Classe difficoltà", action.saveDc));
+    fields.push(actionReadOnlyField("Con successo", action.successOutcome, true));
+  }
+  fields.push(actionReadOnlyField("Effetto", actionEffectLabels[action.effectType]));
+  if (action.effectType === "damage") {
+    fields.push(actionReadOnlyField("Dadi danno", action.damageDice));
+    fields.push(actionReadOnlyField("Bonus ai danni", action.damageBonus));
+    fields.push(actionReadOnlyField("Tipo di danno", action.damageType));
+  } else {
+    fields.push(actionReadOnlyField(actionEffectLabels[action.effectType], action.effectValue));
+    if (action.effectDetail) fields.push(actionReadOnlyField(action.effectType === "condition" ? "Durata" : "Dettagli", action.effectDetail, true));
+  }
+  fields.push(actionReadOnlyField("Disponibilità", resource ? `${resource.name || "Risorsa"} (${resource.current}/${resource.max})` : "Sempre disponibile", true));
+  if (resource) fields.push(actionReadOnlyField("Consuma", String(action.resourceAmount || 1)));
+  if (action.notes) fields.push(actionReadOnlyField("Note", action.notes, true));
+  return `<div class="action-readonly-grid">${fields.join("")}</div>`;
+}
+
+function renderActionEditor(action, index, resource) {
+  const resolutionFields =
+    action.resolutionType === "attack_roll"
+      ? '<label class="field"><span>Bonus al tiro</span><input data-action="' + index + '" data-action-field="attackBonus" value="' + escapeAttribute(action.attackBonus) + '" placeholder="es. +5" /></label>'
+      : action.resolutionType === "saving_throw"
+        ? '<label class="field"><span>TS</span><select data-action="' + index + '" data-action-field="saveAbility" data-action-rerender="true">' + optionList({ strength: "Forza", dexterity: "Destrezza", constitution: "Costituzione", intelligence: "Intelligenza", wisdom: "Saggezza", charisma: "Carisma" }, action.saveAbility) + '</select></label><label class="field"><span>Classe difficolta</span><input data-action="' + index + '" data-action-field="saveDc" type="number" inputmode="numeric" value="' + escapeAttribute(action.saveDc) + '" /></label><label class="field full-row"><span>Con successo</span><input data-action="' + index + '" data-action-field="successOutcome" value="' + escapeAttribute(action.successOutcome) + '" placeholder="es. meta danni" /></label>'
+        : "";
+  const costFields = resource
+    ? '<label class="field"><span>Consuma</span><input data-action="' + index + '" data-action-field="resourceAmount" type="number" min="1" inputmode="numeric" value="' + escapeAttribute(action.resourceAmount) + '" /></label>'
+    : "";
+  return '<div class="action-grid"><label class="field full-row"><span>Nome</span><input data-action="' + index + '" data-action-field="name" value="' + escapeAttribute(action.name) + '" /></label><label class="field"><span>Attivazione</span><select data-action="' + index + '" data-action-field="activation" data-action-rerender="true">' + optionList(actionActivationLabels, action.activation) + '</select></label><label class="field"><span>Bersaglio</span><select data-action="' + index + '" data-action-field="target">' + optionList(actionTargetLabels, action.target) + '</select></label><label class="field full-row"><span>Risoluzione</span><select data-action="' + index + '" data-action-field="resolutionType" data-action-rerender="true">' + optionList(actionResolutionLabels, action.resolutionType) + '</select></label>' + resolutionFields + actionEffectFields(action, index) + '<label class="field full-row"><span>Disponibilita</span><select data-action="' + index + '" data-action-field="resourceId" data-action-rerender="true">' + actionResourceOptions(action) + '</select></label>' + costFields + '<label class="field full-row"><span>Note</span><textarea data-action="' + index + '" data-action-field="notes" rows="2">' + escapeHtml(action.notes) + '</textarea></label></div>';
+}
+
 function renderActions() {
   const list = document.getElementById("actionList");
   if (!list) return;
@@ -681,17 +728,12 @@ function renderActions() {
         .map((action, index) => {
           const resource = actionResource(action);
           const canUse = resource && Number(resource.current) >= Number(action.resourceAmount || 1);
-          const resolutionFields =
-            action.resolutionType === "attack_roll"
-              ? '<label class="field"><span>Bonus al tiro</span><input data-action="' + index + '" data-action-field="attackBonus" value="' + escapeAttribute(action.attackBonus) + '" placeholder="es. +5" /></label>'
-              : action.resolutionType === "saving_throw"
-                ? '<label class="field"><span>TS</span><select data-action="' + index + '" data-action-field="saveAbility" data-action-rerender="true">' + optionList({ strength: "Forza", dexterity: "Destrezza", constitution: "Costituzione", intelligence: "Intelligenza", wisdom: "Saggezza", charisma: "Carisma" }, action.saveAbility) + '</select></label><label class="field"><span>Classe difficolta</span><input data-action="' + index + '" data-action-field="saveDc" type="number" inputmode="numeric" value="' + escapeAttribute(action.saveDc) + '" /></label><label class="field full-row"><span>Con successo</span><input data-action="' + index + '" data-action-field="successOutcome" value="' + escapeAttribute(action.successOutcome) + '" placeholder="es. meta danni" /></label>'
-                : "";
-          const costFields = resource
-            ? '<label class="field"><span>Consuma</span><input data-action="' + index + '" data-action-field="resourceAmount" type="number" min="1" inputmode="numeric" value="' + escapeAttribute(action.resourceAmount) + '" /></label>'
-            : "";
           const panelId = `action:${action.id}`;
-          return '<details class="action-card" data-action-card="' + index + '" data-ui-panel="' + escapeAttribute(panelId) + '"' + (action.id === openActionId || isPanelOpen(panelId) ? " open" : "") + '><summary><span data-action-name="' + index + '">' + escapeHtml(action.name || "Nuova azione") + '</span><small data-action-summary="' + index + '">' + escapeHtml(actionQuickSummary(action)) + '</small></summary><div class="action-editor"><div class="action-grid"><label class="field full-row"><span>Nome</span><input data-action="' + index + '" data-action-field="name" value="' + escapeAttribute(action.name) + '" /></label><label class="field"><span>Attivazione</span><select data-action="' + index + '" data-action-field="activation" data-action-rerender="true">' + optionList(actionActivationLabels, action.activation) + '</select></label><label class="field"><span>Bersaglio</span><select data-action="' + index + '" data-action-field="target">' + optionList(actionTargetLabels, action.target) + '</select></label><label class="field full-row"><span>Risoluzione</span><select data-action="' + index + '" data-action-field="resolutionType" data-action-rerender="true">' + optionList(actionResolutionLabels, action.resolutionType) + '</select></label>' + resolutionFields + actionEffectFields(action, index) + '<label class="field full-row"><span>Disponibilita</span><select data-action="' + index + '" data-action-field="resourceId" data-action-rerender="true">' + actionResourceOptions(action) + '</select></label>' + costFields + '<label class="field full-row"><span>Note</span><textarea data-action="' + index + '" data-action-field="notes" rows="2">' + escapeHtml(action.notes) + '</textarea></label></div><div class="action-card-footer">' + (resource ? '<button class="small-button" data-use-action="' + index + '" type="button"' + (canUse ? "" : " disabled") + ">Usa (" + action.resourceAmount + ")</button>" : "") + '<button class="small-button remove-action" data-remove-action="' + index + '" type="button">Rimuovi</button></div></div></details>';
+          const isEditing = editingActionIds.has(action.id);
+          const body = isEditing ? renderActionEditor(action, index, resource) : renderActionReadOnly(action, resource);
+          const useButton = resource ? '<button class="small-button" data-use-action="' + index + '" type="button"' + (canUse ? "" : " disabled") + ">Usa (" + action.resourceAmount + ")</button>" : "";
+          const controls = '<div class="action-card-controls"><button class="small-button" data-edit-action="' + index + '" type="button">' + (isEditing ? "Salva" : "Modifica") + '</button><button class="small-button remove-action" data-remove-action="' + index + '" type="button">Rimuovi</button></div>';
+          return '<details class="action-card" data-action-card="' + index + '" data-ui-panel="' + escapeAttribute(panelId) + '"' + (action.id === openActionId || isPanelOpen(panelId) ? " open" : "") + '><summary><span data-action-name="' + index + '">' + escapeHtml(action.name || "Nuova azione") + '</span><small data-action-summary="' + index + '">' + escapeHtml(actionQuickSummary(action)) + '</small></summary><div class="action-editor">' + body + '<div class="action-card-footer">' + useButton + controls + '</div></div></details>';
         })
         .join("")
     : '<div class="empty-state">Nessuna azione. Aggiungine una per iniziare.</div>';
@@ -730,14 +772,37 @@ function renderActions() {
     });
   });
 
+  list.querySelectorAll("[data-edit-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const action = state.actions[Number(button.dataset.editAction)];
+      if (!action) return;
+      if (editingActionIds.has(action.id)) editingActionIds.delete(action.id);
+      else editingActionIds.add(action.id);
+      openActionId = action.id;
+      renderActions();
+      saveState();
+    });
+  });
+
   list.querySelectorAll("[data-remove-action]").forEach((button) => {
     button.addEventListener("click", () => {
       const action = state.actions[Number(button.dataset.removeAction)];
-      state.actions.splice(Number(button.dataset.removeAction), 1);
-      if (openActionId === action?.id) openActionId = null;
-      if (action?.id) savePanelState(`action:${action.id}`, false);
-      saveState();
-      renderActions();
+      if (!action) return;
+      requestItemRemoval({
+        title: `Rimuovere ${action.name || "questa azione"}?`,
+        text: "L’azione verrà eliminata dalla scheda e non potrà essere recuperata.",
+        confirmLabel: "Rimuovi azione",
+        onConfirm: () => {
+          const actionIndex = state.actions.findIndex((item) => item.id === action.id);
+          if (actionIndex < 0) return;
+          state.actions.splice(actionIndex, 1);
+          editingActionIds.delete(action.id);
+          if (openActionId === action.id) openActionId = null;
+          savePanelState(`action:${action.id}`, false);
+          saveState();
+          renderActions();
+        },
+      });
     });
   });
 }
@@ -818,9 +883,20 @@ function renderSlots() {
 
   grid.querySelectorAll("[data-remove-slot]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.slots.splice(Number(button.dataset.removeSlot), 1);
-      renderSlots();
-      saveState();
+      const slot = state.slots[Number(button.dataset.removeSlot)];
+      if (!slot) return;
+      requestItemRemoval({
+        title: `Rimuovere gli slot di livello ${slot.level}?`,
+        text: "Il livello e i relativi valori verranno rimossi dalla scheda.",
+        confirmLabel: "Rimuovi slot",
+        onConfirm: () => {
+          const slotIndex = state.slots.findIndex((item) => Number(item.level) === Number(slot.level));
+          if (slotIndex < 0) return;
+          state.slots.splice(slotIndex, 1);
+          renderSlots();
+          saveState();
+        },
+      });
     });
   });
 }
@@ -1075,22 +1151,19 @@ function renderSpellPicker() {
 
   list.querySelectorAll("[data-delete-custom-spell]").forEach((button) => {
     button.addEventListener("click", () => {
-      deleteCustomSpell(button.dataset.deleteCustomSpell);
+      requestCustomSpellDeletion(button.dataset.deleteCustomSpell);
     });
   });
 
   knownList.querySelectorAll("[data-remove-spell]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.knownSpellIds = state.knownSpellIds.filter((id) => id !== button.dataset.removeSpell);
-      state.preparedSpellIds = state.preparedSpellIds.filter((id) => id !== button.dataset.removeSpell);
-      saveState();
-      renderSpellPicker();
+      requestKnownSpellRemoval(button.dataset.removeSpell);
     });
   });
 
   knownList.querySelectorAll("[data-delete-custom-spell]").forEach((button) => {
     button.addEventListener("click", () => {
-      deleteCustomSpell(button.dataset.deleteCustomSpell);
+      requestCustomSpellDeletion(button.dataset.deleteCustomSpell);
     });
   });
 
@@ -1244,6 +1317,32 @@ function clearCustomSpellForm() {
   });
   const source = document.getElementById("customSpellSource");
   if (source) source.value = "Custom";
+}
+
+function requestKnownSpellRemoval(id) {
+  const spell = spellDatabase().find((item) => item.id === id);
+  requestItemRemoval({
+    title: `Rimuovere ${spell?.name_it || spell?.name || "questo incantesimo"}?`,
+    text: "L’incantesimo verrà tolto dal personaggio, ma resterà disponibile nel database.",
+    confirmLabel: "Rimuovi incantesimo",
+    onConfirm: () => {
+      state.knownSpellIds = state.knownSpellIds.filter((spellId) => spellId !== id);
+      state.preparedSpellIds = state.preparedSpellIds.filter((spellId) => spellId !== id);
+      saveState();
+      renderSpellPicker();
+    },
+  });
+}
+
+function requestCustomSpellDeletion(id) {
+  const spell = state.customSpells.find((item) => item.id === id);
+  if (!spell) return;
+  requestItemRemoval({
+    title: `Eliminare ${spell.name_it || spell.name || "questo incantesimo custom"} dal database?`,
+    text: "L’incantesimo custom verrà eliminato dal database locale e da questo personaggio.",
+    confirmLabel: "Elimina dal DB",
+    onConfirm: () => deleteCustomSpell(id),
+  });
 }
 
 function deleteCustomSpell(id) {
@@ -1415,33 +1514,42 @@ function syncResourceCounter(row, resource) {
 function requestResourceRemoval(resourceId) {
   const resource = state.resources.find((item) => item.id === resourceId);
   if (!resource) return;
-  pendingResourceRemovalId = resource.id;
-  document.getElementById("deleteResourceConfirmTitle").textContent = `Eliminare ${resource.name || "questa risorsa"}?`;
-  document.getElementById("deleteResourceConfirmText").textContent = "Questa azione non può essere annullata. Le azioni collegate smetteranno di consumare questa risorsa.";
-  document.getElementById("deleteResourceConfirmBackdrop").hidden = false;
-  document.getElementById("cancelDeleteResourceButton").focus();
-}
-
-function closeResourceRemovalConfirm() {
-  pendingResourceRemovalId = "";
-  document.getElementById("deleteResourceConfirmBackdrop").hidden = true;
-}
-
-function confirmResourceRemoval() {
-  const resourceId = pendingResourceRemovalId;
-  const resourceIndex = state.resources.findIndex((item) => item.id === resourceId);
-  if (resourceIndex < 0) {
-    closeResourceRemovalConfirm();
-    return;
-  }
-  const removed = state.resources.splice(resourceIndex, 1)[0];
-  if (removed?.id) state.actions.forEach((action) => {
-    if (action.resourceId === removed.id) action.resourceId = "";
+  requestItemRemoval({
+    title: `Rimuovere ${resource.name || "questa risorsa"}?`,
+    text: "Le azioni collegate smetteranno di consumare questa risorsa. L’operazione non può essere annullata.",
+    confirmLabel: "Rimuovi risorsa",
+    onConfirm: () => {
+      const resourceIndex = state.resources.findIndex((item) => item.id === resourceId);
+      if (resourceIndex < 0) return;
+      const removed = state.resources.splice(resourceIndex, 1)[0];
+      if (removed?.id) state.actions.forEach((action) => {
+        if (action.resourceId === removed.id) action.resourceId = "";
+      });
+      renderResources();
+      renderActions();
+      saveState();
+    },
   });
-  closeResourceRemovalConfirm();
-  renderResources();
-  renderActions();
-  saveState();
+}
+
+function requestItemRemoval({ title, text, confirmLabel = "Rimuovi", onConfirm }) {
+  pendingRemovalAction = typeof onConfirm === "function" ? onConfirm : null;
+  document.getElementById("deleteItemConfirmTitle").textContent = title;
+  document.getElementById("deleteItemConfirmText").textContent = text || "Questa azione non può essere annullata.";
+  document.getElementById("confirmDeleteItemButton").textContent = confirmLabel;
+  document.getElementById("deleteItemConfirmBackdrop").hidden = false;
+  document.getElementById("cancelDeleteItemButton").focus();
+}
+
+function closeItemRemovalConfirm() {
+  pendingRemovalAction = null;
+  document.getElementById("deleteItemConfirmBackdrop").hidden = true;
+}
+
+function confirmItemRemoval() {
+  const action = pendingRemovalAction;
+  closeItemRemovalConfirm();
+  action?.();
 }
 
 function renderEquipment() {
@@ -1498,12 +1606,23 @@ function renderEquipment() {
   list.querySelectorAll("[data-remove-equipment]").forEach((button) => {
     button.addEventListener("click", () => {
       const index = Number(button.dataset.removeEquipment);
-      state.equipmentItems.splice(index, 1);
-      openEquipmentIndex = null;
-      clearPanelStates("equipment:");
-      state.equipment = state.equipmentItems.map((item) => item.name).filter(Boolean).join(", ");
-      renderEquipment();
-      saveState();
+      const item = state.equipmentItems[index];
+      if (!item) return;
+      requestItemRemoval({
+        title: `Rimuovere ${item.name || "questo oggetto"}?`,
+        text: "L’oggetto verrà eliminato dalla Borsa e non potrà essere recuperato.",
+        confirmLabel: "Rimuovi oggetto",
+        onConfirm: () => {
+          const itemIndex = state.equipmentItems.indexOf(item);
+          if (itemIndex < 0) return;
+          state.equipmentItems.splice(itemIndex, 1);
+          openEquipmentIndex = null;
+          clearPanelStates("equipment:");
+          state.equipment = state.equipmentItems.map((equipmentItem) => equipmentItem.name).filter(Boolean).join(", ");
+          renderEquipment();
+          saveState();
+        },
+      });
     });
   });
 }
@@ -1559,14 +1678,14 @@ function bindActions() {
     renderResources();
     saveState();
   });
-  document.getElementById("cancelDeleteResourceButton").addEventListener("click", closeResourceRemovalConfirm);
-  document.getElementById("confirmDeleteResourceButton").addEventListener("click", confirmResourceRemoval);
-  document.getElementById("deleteResourceConfirmBackdrop").addEventListener("click", (event) => {
-    if (event.target.id === "deleteResourceConfirmBackdrop") closeResourceRemovalConfirm();
+  document.getElementById("cancelDeleteItemButton").addEventListener("click", closeItemRemovalConfirm);
+  document.getElementById("confirmDeleteItemButton").addEventListener("click", confirmItemRemoval);
+  document.getElementById("deleteItemConfirmBackdrop").addEventListener("click", (event) => {
+    if (event.target.id === "deleteItemConfirmBackdrop") closeItemRemovalConfirm();
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !document.getElementById("deleteResourceConfirmBackdrop").hidden) {
-      closeResourceRemovalConfirm();
+    if (event.key === "Escape" && !document.getElementById("deleteItemConfirmBackdrop").hidden) {
+      closeItemRemovalConfirm();
     }
   });
   document.getElementById("addSlotButton").addEventListener("click", () => {
@@ -1595,11 +1714,12 @@ function bindActions() {
     );
     state.actions.push(action);
     openActionId = action.id;
+    editingActionIds.add(action.id);
     savePanelState(`action:${action.id}`, true);
     renderActions();
     saveState();
   });
-  document.getElementById("themeButton").addEventListener("click", toggleTheme);
+  ["themeButton", "drawerThemeButton"].forEach((id) => document.getElementById(id)?.addEventListener("click", toggleTheme));
 
   document.querySelectorAll(".tab-button").forEach((button) => {
     button.addEventListener("click", () => activateCharacterTab(button.dataset.tab, true));
@@ -1618,6 +1738,11 @@ function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem(THEME_KEY, theme);
   document.getElementById("themeButton").setAttribute("aria-pressed", theme === "light" ? "true" : "false");
+  const drawerThemeButton = document.getElementById("drawerThemeButton");
+  if (drawerThemeButton) {
+    drawerThemeButton.textContent = theme === "light" ? "Passa al tema scuro" : "Passa al tema chiaro";
+    drawerThemeButton.setAttribute("aria-pressed", theme === "light" ? "true" : "false");
+  }
 }
 
 function toggleTheme() {
