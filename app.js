@@ -1204,33 +1204,82 @@ function renderResources() {
   if (!list) return;
   list.innerHTML = state.resources.length
     ? state.resources
-        .map(
-          (resource, index) => `
+        .map((resource) => {
+          clampResource(resource);
+          return `
             <article class="resource-row">
-              <label><span>Nome</span><input data-resource="${index}" data-resource-field="name" value="${escapeAttribute(resource.name)}" /></label>
-              <label><span>Attuale</span><input data-resource="${index}" data-resource-field="current" type="number" inputmode="numeric" value="${escapeAttribute(resource.current)}" /></label>
-              <label><span>Max</span><input data-resource="${index}" data-resource-field="max" type="number" inputmode="numeric" value="${escapeAttribute(resource.max)}" /></label>
-              <label><span>Recupero</span><select data-resource="${index}" data-resource-field="recovery"><option value="none" ${resource.recovery === "none" ? "selected" : ""}>Mai</option><option value="short" ${resource.recovery === "short" ? "selected" : ""}>Breve</option><option value="long" ${resource.recovery === "long" ? "selected" : ""}>Lungo</option></select></label>
-              <button class="small-button remove-resource" data-remove-resource="${escapeAttribute(resource.id)}" type="button">Elimina risorsa…</button>
+              <div class="resource-header">
+                <label class="resource-name"><span>Nome</span><input data-resource="${escapeAttribute(resource.id)}" data-resource-field="name" value="${escapeAttribute(resource.name)}" /></label>
+                <label class="resource-max"><span>Max</span><input data-resource="${escapeAttribute(resource.id)}" data-resource-field="max" type="number" inputmode="numeric" min="0" value="${escapeAttribute(resource.max)}" /></label>
+              </div>
+              <div class="resource-counter" role="group" aria-label="Contatore ${escapeAttribute(resource.name || "risorsa")}">
+                <button class="resource-step" data-resource-step="${escapeAttribute(resource.id)}" data-step="-1" type="button" aria-label="Diminuisci ${escapeAttribute(resource.name || "risorsa")}" ${resource.current <= 0 ? "disabled" : ""}>−</button>
+                <output class="resource-count" aria-live="polite" aria-label="${escapeAttribute(`${resource.current} su ${resource.max}`)}">
+                  <strong data-resource-current>${resource.current}</strong><span>/</span><small data-resource-maximum>${resource.max}</small>
+                </output>
+                <button class="resource-step" data-resource-step="${escapeAttribute(resource.id)}" data-step="1" type="button" aria-label="Aumenta ${escapeAttribute(resource.name || "risorsa")}" ${resource.current >= resource.max ? "disabled" : ""}>+</button>
+              </div>
+              <div class="resource-footer">
+                <label class="resource-recovery"><span>Recupero</span><select data-resource="${escapeAttribute(resource.id)}" data-resource-field="recovery"><option value="none" ${resource.recovery === "none" ? "selected" : ""}>Mai</option><option value="short" ${resource.recovery === "short" ? "selected" : ""}>Breve</option><option value="long" ${resource.recovery === "long" ? "selected" : ""}>Lungo</option></select></label>
+                <button class="small-button remove-resource" data-remove-resource="${escapeAttribute(resource.id)}" type="button">Rimuovi…</button>
+              </div>
             </article>
-          `
-        )
+          `;
+        })
         .join("")
     : `<div class="empty-state">Nessuna risorsa.</div>`;
 
   list.querySelectorAll("[data-resource]").forEach((field) => {
     field.addEventListener(field.tagName === "SELECT" ? "change" : "input", () => {
-      const index = Number(field.dataset.resource);
+      const resource = state.resources.find((item) => item.id === field.dataset.resource);
+      if (!resource) return;
       const key = field.dataset.resourceField;
-      state.resources[index][key] = field.type === "number" ? Number(field.value) : field.value;
+      resource[key] = field.type === "number" ? Number(field.value) : field.value;
+      if (key === "max") {
+        clampResource(resource);
+      }
+      if (key === "name" || key === "max") syncResourceCounter(field.closest(".resource-row"), resource);
       saveState();
-      if (key === "name" || key === "current" || key === "max" || key === "recovery") renderActions();
+      renderActions();
+    });
+  });
+
+  list.querySelectorAll("[data-resource-step]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const resource = state.resources.find((item) => item.id === button.dataset.resourceStep);
+      if (!resource) return;
+      clampResource(resource);
+      resource.current = Math.min(resource.max, Math.max(0, resource.current + Number(button.dataset.step)));
+      syncResourceCounter(button.closest(".resource-row"), resource);
+      saveState();
+      renderActions();
     });
   });
 
   list.querySelectorAll("[data-remove-resource]").forEach((button) => {
     button.addEventListener("click", () => requestResourceRemoval(button.dataset.removeResource));
   });
+}
+
+function clampResource(resource) {
+  resource.max = Math.max(0, Number(resource.max) || 0);
+  resource.current = Math.min(resource.max, Math.max(0, Number(resource.current) || 0));
+}
+
+function syncResourceCounter(row, resource) {
+  if (!row) return;
+  const resourceLabel = resource.name || "risorsa";
+  row.querySelector(".resource-counter").setAttribute("aria-label", `Contatore ${resourceLabel}`);
+  row.querySelector("[data-resource-current]").textContent = resource.current;
+  row.querySelector("[data-resource-maximum]").textContent = resource.max;
+  const output = row.querySelector(".resource-count");
+  output.setAttribute("aria-label", `${resource.current} su ${resource.max}`);
+  const decreaseButton = row.querySelector('[data-step="-1"]');
+  const increaseButton = row.querySelector('[data-step="1"]');
+  decreaseButton.setAttribute("aria-label", `Diminuisci ${resourceLabel}`);
+  increaseButton.setAttribute("aria-label", `Aumenta ${resourceLabel}`);
+  decreaseButton.disabled = resource.current <= 0;
+  increaseButton.disabled = resource.current >= resource.max;
 }
 
 function requestResourceRemoval(resourceId) {

@@ -1198,13 +1198,26 @@ summary {
 
 .resource-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 72px 72px 112px auto;
-  gap: 7px;
-  align-items: end;
-  padding: 9px;
+  gap: 12px;
+  padding: 11px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
+}
+
+.resource-header,
+.resource-footer {
+  display: grid;
+  gap: 8px;
+  align-items: end;
+}
+
+.resource-header {
+  grid-template-columns: minmax(0, 1fr) 82px;
+}
+
+.resource-footer {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .resource-row label {
@@ -1213,7 +1226,7 @@ summary {
   min-width: 0;
 }
 
-.resource-row span {
+.resource-row label > span {
   color: var(--muted);
   font-size: 10px;
   font-weight: 800;
@@ -1232,10 +1245,58 @@ summary {
   padding: 0 8px;
 }
 
+.resource-counter {
+  display: grid;
+  grid-template-columns: 48px minmax(96px, 1fr) 48px;
+  gap: 10px;
+  align-items: center;
+  justify-self: center;
+  width: min(100%, 270px);
+}
+
+.resource-step {
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 26px;
+  font-weight: 900;
+}
+
+.resource-step:disabled {
+  opacity: 0.38;
+}
+
+.resource-count {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--field-bg);
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.resource-count strong {
+  color: var(--gold);
+  font-size: 27px;
+}
+
+.resource-count span {
+  margin-inline: 5px;
+  font-size: 18px;
+}
+
+.resource-count small {
+  font-size: 18px;
+}
+
 .remove-resource {
-  grid-column: 1 / -1;
-  justify-self: end;
-  min-width: 132px;
+  min-width: 128px;
   min-height: 38px;
   padding-inline: 14px;
 }
@@ -1922,16 +1983,6 @@ summary {
 @media (max-width: 600px) {
   #characterView:not([hidden]) ~ .floating-theme-button {
     display: none;
-  }
-
-  .resource-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .resource-row label:first-child,
-  .resource-row label:nth-child(4),
-  .remove-resource {
-    grid-column: 1 / -1;
   }
 }
 
