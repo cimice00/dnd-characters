@@ -1234,7 +1234,10 @@ summary {
 
 .remove-resource {
   grid-column: 1 / -1;
+  justify-self: end;
+  min-width: 132px;
   min-height: 38px;
+  padding-inline: 14px;
 }
 
 .equipment-item {

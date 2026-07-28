@@ -184,6 +184,7 @@ const defaultState = {
 let state = loadState();
 let openEquipmentIndex = null;
 let openActionId = null;
+let pendingResourceRemovalId = "";
 
 function loadState() {
   try {
@@ -1210,7 +1211,7 @@ function renderResources() {
               <label><span>Attuale</span><input data-resource="${index}" data-resource-field="current" type="number" inputmode="numeric" value="${escapeAttribute(resource.current)}" /></label>
               <label><span>Max</span><input data-resource="${index}" data-resource-field="max" type="number" inputmode="numeric" value="${escapeAttribute(resource.max)}" /></label>
               <label><span>Recupero</span><select data-resource="${index}" data-resource-field="recovery"><option value="none" ${resource.recovery === "none" ? "selected" : ""}>Mai</option><option value="short" ${resource.recovery === "short" ? "selected" : ""}>Breve</option><option value="long" ${resource.recovery === "long" ? "selected" : ""}>Lungo</option></select></label>
-              <button class="small-button remove-resource" data-remove-resource="${index}" type="button">Rimuovi</button>
+              <button class="small-button remove-resource" data-remove-resource="${escapeAttribute(resource.id)}" type="button">Elimina risorsa…</button>
             </article>
           `
         )
@@ -1228,16 +1229,40 @@ function renderResources() {
   });
 
   list.querySelectorAll("[data-remove-resource]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const removed = state.resources.splice(Number(button.dataset.removeResource), 1)[0];
-      if (removed?.id) state.actions.forEach((action) => {
-        if (action.resourceId === removed.id) action.resourceId = "";
-      });
-      renderResources();
-      renderActions();
-      saveState();
-    });
+    button.addEventListener("click", () => requestResourceRemoval(button.dataset.removeResource));
   });
+}
+
+function requestResourceRemoval(resourceId) {
+  const resource = state.resources.find((item) => item.id === resourceId);
+  if (!resource) return;
+  pendingResourceRemovalId = resource.id;
+  document.getElementById("deleteResourceConfirmTitle").textContent = `Eliminare ${resource.name || "questa risorsa"}?`;
+  document.getElementById("deleteResourceConfirmText").textContent = "Questa azione non può essere annullata. Le azioni collegate smetteranno di consumare questa risorsa.";
+  document.getElementById("deleteResourceConfirmBackdrop").hidden = false;
+  document.getElementById("cancelDeleteResourceButton").focus();
+}
+
+function closeResourceRemovalConfirm() {
+  pendingResourceRemovalId = "";
+  document.getElementById("deleteResourceConfirmBackdrop").hidden = true;
+}
+
+function confirmResourceRemoval() {
+  const resourceId = pendingResourceRemovalId;
+  const resourceIndex = state.resources.findIndex((item) => item.id === resourceId);
+  if (resourceIndex < 0) {
+    closeResourceRemovalConfirm();
+    return;
+  }
+  const removed = state.resources.splice(resourceIndex, 1)[0];
+  if (removed?.id) state.actions.forEach((action) => {
+    if (action.resourceId === removed.id) action.resourceId = "";
+  });
+  closeResourceRemovalConfirm();
+  renderResources();
+  renderActions();
+  saveState();
 }
 
 function renderEquipment() {
@@ -1347,6 +1372,16 @@ function bindActions() {
     state.resources.push({ id: newId("resource"), name: "Nuova risorsa", current: 0, max: 0, recovery: "none" });
     renderResources();
     saveState();
+  });
+  document.getElementById("cancelDeleteResourceButton").addEventListener("click", closeResourceRemovalConfirm);
+  document.getElementById("confirmDeleteResourceButton").addEventListener("click", confirmResourceRemoval);
+  document.getElementById("deleteResourceConfirmBackdrop").addEventListener("click", (event) => {
+    if (event.target.id === "deleteResourceConfirmBackdrop") closeResourceRemovalConfirm();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !document.getElementById("deleteResourceConfirmBackdrop").hidden) {
+      closeResourceRemovalConfirm();
+    }
   });
   document.getElementById("addSlotButton").addEventListener("click", () => {
     const level = Number(document.getElementById("slotLevelToAdd")?.value);
